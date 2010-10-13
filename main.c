@@ -205,6 +205,35 @@ void commanderProcess(int wfd)
   }
 }
 
+void reporterProcess(int time, QUE *s_run, QUE *s_ready, QUE *s_block){
+  printf("*********************************************\n");
+  printf("The current system state is as follows:\n");
+  printf("*********************************************\n");
+  printf("CURRENT TIME: %d\n", time);
+  printf("\n");
+  printf("RUNNING PROCESS:\n");
+  show("Running States: ", s_run);
+  //TODO: Formatting the data as following:
+  //pid, ppid, priority, value, start time, CPU time used so far
+  printf("\n");
+  printf("BLOCKED PROCESSES:\n");
+  show("Queue of blocked processes: ", s_block);
+  //TODO: Formatting the data as following:
+  //pid, ppid, priority, value, start time, CPU time used so far
+  printf("\n");
+  printf("PROCESSES READY TO EXECUTE:\n");
+  show("Queue of processes with priority 0: ", s_ready);
+  //TODO: Formatting the data as following:
+  //pid, ppid, value, start time, CPU time used so far
+  
+  //show("Queue of processes with priority 1: ", s_ready);
+  // ...
+  //show("Queue of processes with priority 3: ", s_ready);
+  printf("Terminated Reporter Process.\n");
+  printf("\n");
+  exit(3);
+}
+
 void processManagerProcess(int rfd)
 {
   FILE *fp = fdopen(rfd, "r");
@@ -245,6 +274,7 @@ void processManagerProcess(int rfd)
   int n;
   struct State temp_state;
   int temp_value;
+  int temp_pid;
   
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
     printf("Instruction=%s",buffer);
@@ -253,38 +283,38 @@ void processManagerProcess(int rfd)
       cmd = split(&n, prog[cpu.pc]);
       printf("cmd[0]=%s\n",cmd[0]);
       
-      if(!strcmp(cmd[0],"S")){
+      if(!strcmp(cmd[0], "S")){
 	printf("Set the value of the integer variable to %d.\n", atoi(cmd[1]));
 	temp_value = cpu.value;
 	cpu.value = atoi(cmd[1]);
 	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
 	
-      }else if(!strcmp(cmd[0],"A")){
+      }else if(!strcmp(cmd[0], "A")){
 	printf("Add %d to the value of the integer variable.\n", atoi(cmd[1]));
 	temp_value = cpu.value;
 	cpu.value += atoi(cmd[1]);
 	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
 	
-      }else if(!strcmp(cmd[0],"D")){
+      }else if(!strcmp(cmd[0], "D")){
 	printf("Substract %d from the value of the integer variable.\n", atoi(cmd[1]));
 	temp_value = cpu.value;
 	cpu.value -= atoi(cmd[1]);
 	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
 	
-      }else if(!strcmp(cmd[0],"B\n")){
+      }else if(!strcmp(cmd[0], "B\n")){
 	printf("Block this simulated process.\n");
 	temp_state = dequeue(&running_states);
 	printf("pid=%d is blocked.\n", temp_state.pid);
 	enqueue(&blocked_states, temp_state);
 	// TODO: scheduling required.
 	
-      }else if(!strcmp(cmd[0],"E\n")){
+      }else if(!strcmp(cmd[0], "E\n")){
 	printf("Terminate this simulated process.\n");
 	temp_state = dequeue(&running_states);
 	printf("pid=%d is Terminated.\n", temp_state.pid);
 	// TODO: scheduling required.
 	
-      }else if(!strcmp(cmd[0],"F")){
+      }else if(!strcmp(cmd[0], "F")){
 	printf("Create a new simulated process at %d times.\n", atoi(cmd[1]));
 	arg = atoi(cmd[1]);
 	for(x=0; x<arg; x++){
@@ -323,10 +353,13 @@ void processManagerProcess(int rfd)
       
     }else if(!strcmp(buffer, "P\n")){
       printf("Print the current state of the system.\n");
-      show("Running States: ", running_states);
-      show("Ready States: ", ready_states);
-      show("Blocked States: ", blocked_states);
-      
+      if ((temp_pid = fork()) == -1) {
+	perror("fork");
+      } else if (temp_pid == 0) {
+	reporterProcess(time, running_states, ready_states, blocked_states);
+      } else {
+	// Do nohing.
+      }      
     }else if(!strcmp(buffer, "T\n")){
       printf("Print the average turnaround time, and terminate the system.\n");
       return;
