@@ -32,16 +32,16 @@ struct PcbTable
 struct ReadyState{
   int *next;
   int pid[];
-}ready_state;
+};
 
 struct BlockedState{
   int *next;
   int pid[];
-}blocked_state;
+};
 
 struct RunningState{
   int pid;
-}running_state;
+};
   
 
 static char buffer[BUFSIZ];
@@ -113,7 +113,8 @@ void commanderProcess(int wfd)
   }
 }
 
-void simulatedProcess(int wfd, int pid, char prog[][STR_MAX]){
+void simulatedProcess(int rfd, int pid, char prog[][STR_MAX]){
+  FILE *fp = fdopen(rfd, "r");
   int i=0, j, n;
   char **cmd;
   while(strcmp(prog[i],"E\n")){
@@ -156,8 +157,16 @@ void processManagerProcess(int rfd)
   char *fname = "init";
   char prog[LINE_MAX][STR_MAX];
   int i=0;
-
   int rv = 0, fd[2], pid;
+
+  /* ProcessManager's 6 Data Structures*/
+  int time = 0;
+  struct Cpu cpu;
+  struct PcbTable ptable;
+  struct ReadyState ready_state;
+  struct BlockedState blocked_state;
+  struct RunningState running_state;
+  /**************************************/
   
   if (fp == NULL) {
     perror("child: fdopen");
@@ -175,14 +184,17 @@ void processManagerProcess(int rfd)
     close(fd[0]);
     readProgram(fname, prog);
     simulatedProcess(fd[1], 0, prog);
+    exit(1);    
   } else {
     close(fd[1]);
+    FILE *wfp = fdopen(fd[1], "w");
   }
   
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
     printf("buffer=%s",buffer);
     if(!strcmp(buffer, "Q\n")){
       printf("End of one unit of time.\n");
+      time++;
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
     }else if(!strcmp(buffer, "P\n")){
