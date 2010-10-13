@@ -35,37 +35,34 @@ struct PcbTable
   int t_cpu;
 };
 
-struct State{
-  int pid;
-};
 
 static char buffer[BUFSIZ];
 
 typedef struct Que {
-  struct State state;
+  struct PcbTable ptable;
   struct Que *next; /* pointer to next element in list */
 } QUE;
 
 /* Insert into a head */
-QUE *insert_head(QUE **p, struct State s)
+QUE *insert_head(QUE **p, struct PcbTable pt)
 {
   QUE *n = (QUE *) malloc(sizeof(QUE));
   if (n == NULL) return NULL;
 
   n->next = *p;
   *p = n;
-  n->state = s;
+  n->ptable = pt;
 
   return n;
 }
 
 /* Enque into a tail */
-QUE *enqueue(QUE **p, struct State s)
+QUE *enqueue(QUE **p, struct PcbTable pt)
 {
   QUE *tail = *p;
   //printf("pid=%d\n", s.pid);
   if(*p == NULL) // For initial setup
-    return insert_head(p, s);
+    return insert_head(p, pt);
 
   while(tail->next != NULL) //tail refers to a tail node
     tail = tail->next;
@@ -76,18 +73,18 @@ QUE *enqueue(QUE **p, struct State s)
 
   n->next = tail->next;
   tail->next = n;
-  n->state = s;  // equivalent to 'tail->next->state = s;'
+  n->ptable = pt;  // equivalent to 'tail->next->ptable = pt;'
 
   return n;
 }
 
 /* Dequeue from a head */
-struct State dequeue(QUE **p){
-  struct State s;
+struct PcbTable dequeue(QUE **p){
+  struct PcbTable s;
   s.pid = -1;
   if (*p != NULL){
-    //printf("DEQ(pid=%d)\n", (*p)->state.pid);
-      s = (*p)->state;
+    //printf("DEQ(pid=%d)\n", (*p)->ptable.pid);
+      s = (*p)->ptable;
       QUE *n = *p;
       *p = n->next;
       free(n);
@@ -107,7 +104,7 @@ void show(char *str, QUE *n)
     return ;
   }
   while (n != NULL){
-    printf("[%2d]", n->state.pid);
+    printf("[%2d]", n->ptable.pid);
     n = n->next;
   }
   printf("\n");
@@ -212,7 +209,7 @@ void reporterProcess(int time, QUE *s_run, QUE *s_ready, QUE *s_block){
   printf("CURRENT TIME: %d\n", time);
   printf("\n");
   printf("RUNNING PROCESS:\n");
-  show("Running States: ", s_run);
+  show("Running PcbTables: ", s_run);
   //TODO: Formatting the data as following:
   //pid, ppid, priority, value, start time, CPU time used so far
   printf("\n");
@@ -244,7 +241,7 @@ void processManagerProcess(int rfd)
   int pid_cnt = 0;
   int arg;
   int x,y; // iterators
-  struct State init_state;
+  struct PcbTable init_ptable;
   
   /* ProcessManager's 6 Data Structures*/
   int time;
@@ -265,14 +262,14 @@ void processManagerProcess(int rfd)
   ready_states = NULL;
   blocked_states = NULL;
   running_states = NULL; // ???
-  init_state.pid = pid_cnt;
-  enqueue(&running_states, init_state);
+  init_ptable.pid = pid_cnt;
+  enqueue(&running_states, init_ptable);
   /****************/
 
   pid_cnt++;
 
   int n;
-  struct State temp_state;
+  struct PcbTable temp_ptable;
   int temp_value;
   int temp_pid;
   
@@ -303,15 +300,15 @@ void processManagerProcess(int rfd)
 	
       }else if(!strcmp(cmd[0], "B\n")){
 	printf("Block this simulated process.\n");
-	temp_state = dequeue(&running_states);
-	printf("pid=%d is blocked.\n", temp_state.pid);
-	enqueue(&blocked_states, temp_state);
+	temp_ptable = dequeue(&running_states);
+	printf("pid=%d is blocked.\n", temp_ptable.pid);
+	enqueue(&blocked_states, temp_ptable);
 	// TODO: scheduling required.
 	
       }else if(!strcmp(cmd[0], "E\n")){
 	printf("Terminate this simulated process.\n");
-	temp_state = dequeue(&running_states);
-	printf("pid=%d is Terminated.\n", temp_state.pid);
+	temp_ptable = dequeue(&running_states);
+	printf("pid=%d is Terminated.\n", temp_ptable.pid);
 	// TODO: scheduling required.
 	
       }else if(!strcmp(cmd[0], "F")){
@@ -343,12 +340,12 @@ void processManagerProcess(int rfd)
       
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
-      temp_state = dequeue(&blocked_states);
-      if(temp_state.pid == -1){
+      temp_ptable = dequeue(&blocked_states);
+      if(temp_ptable.pid == -1){
 	printf("There are no states in blocked queue.\n");
       }else{
-	printf("pid=%d moves from blocked queue to ready queue.\n", temp_state.pid);
-	enqueue(&ready_states, temp_state);
+	printf("pid=%d moves from blocked queue to ready queue.\n", temp_ptable.pid);
+	enqueue(&ready_states, temp_ptable);
       }
       
     }else if(!strcmp(buffer, "P\n")){
