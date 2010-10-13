@@ -42,36 +42,75 @@ struct State{
 static char buffer[BUFSIZ];
 
 typedef struct Que {
-  struct Que *next;
-  struct State *state;
-}QUE;
-//static QUE *First;
+  struct State state;
+  struct Que *next; /* pointer to next element in list */
+} QUE;
 
-void *get_que(QUE *First){
-  QUE *lp = First;
-  struct State *state;
-  if(lp==NULL){    /* データがキューにない */
-    return NULL;
-  }
-  state = lp->state;
-  lp = lp->next;
-  free(First);
-  First=lp;
-  return state;
+/* Insert into a head */
+QUE *insert_head(QUE **p, struct State s)
+{
+  QUE *n = (QUE *) malloc(sizeof(QUE));
+  if (n == NULL) return NULL;
+
+  n->next = *p;
+  *p = n;
+  n->state = s;
+
+  return n;
 }
 
-void add_que(QUE *First, struct State *state){
-  QUE *lp=First;
-  if(lp!=NULL){
-    while(lp->next!=NULL){
-      lp=lp->next;
-    }
-    lp = lp->next = (QUE*)malloc(sizeof(QUE));
+/* Enque into a tail */
+QUE *enqueue(QUE **p, struct State s)
+{
+  QUE *tail = *p;
+  //printf("pid=%d\n", s.pid);
+  if(*p == NULL) // For initial setup
+    return insert_head(p, s);
+
+  while(tail->next != NULL) //tail refers to a tail node
+    tail = tail->next;
+
+  QUE *n = (QUE *) malloc(sizeof(QUE));
+  if (n == NULL)
+    return NULL;
+
+  n->next = tail->next;
+  tail->next = n;
+  n->state = s;  // equivalent to 'tail->next->state = s;'
+
+  return n;
+}
+
+/* Dequeue from a head */
+struct State dequeue(QUE **p){
+  struct State s;
+  s.pid = -1;
+  if (*p != NULL){
+    //printf("DEQ(pid=%d)\n", (*p)->state.pid);
+      s = (*p)->state;
+      QUE *n = *p;
+      *p = n->next;
+      free(n);
+      return s;
   }else{
-    lp = First=(QUE*)malloc(sizeof(QUE));
+    //printf("cannot remove, because queue is empty\n");
+    return s;
   }
-  lp->state = state;
-  lp->next = NULL;
+}
+
+/* Show a queue */
+void show(char *str, QUE *n)
+{
+  printf("%s", str);
+  if (n == NULL){
+    printf("queue is empty\n");
+    return ;
+  }
+  while (n != NULL){
+    printf("[%2d]", n->state.pid);
+    n = n->next;
+  }
+  printf("\n");
   return;
 }
 
@@ -176,14 +215,15 @@ void processManagerProcess(int rfd)
   int pid_cnt = 0;
   int arg;
   int x,y; // iterators
-
+  struct State init_state;
+  
   /* ProcessManager's 6 Data Structures*/
   int time;
   struct Cpu cpu;
   struct PcbTable ptable[MAX_TABLE];
-  QUE ready_state;
-  QUE blocked_state;
-  struct State running_state;
+  QUE *ready_states;
+  QUE *blocked_states;
+  QUE *running_states;
   /**************************************/
 
   /* Initializing */
@@ -191,15 +231,23 @@ void processManagerProcess(int rfd)
   time = 0;
   cpu.pc = 0;
   cpu.value = 0;
-  ptable[0].pid = pid_cnt;
-  running_state.pid = 0;
+  //ptable[0].pid = pid_cnt;
+  
+  ready_states = NULL;
+  blocked_states = NULL;
+  running_states = NULL; // ???
+  init_state.pid = pid_cnt;
+  enqueue(&running_states, init_state);
   /****************/
 
   pid_cnt++;
 
   int n;
+  struct State temp_state;
+  int temp_value;
+  
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
-    printf("buffer=%s",buffer);
+    printf("Instruction=%s",buffer);
     if(!strcmp(buffer, "Q\n")){
       printf("End of one unit of time.\n");
       cmd = split(&n, prog[cpu.pc]);
@@ -207,22 +255,40 @@ void processManagerProcess(int rfd)
       
       if(!strcmp(cmd[0],"S")){
 	printf("Set the value of the integer variable to %d.\n", atoi(cmd[1]));
+	temp_value = cpu.value;
 	cpu.value = atoi(cmd[1]);
+	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	
       }else if(!strcmp(cmd[0],"A")){
 	printf("Add %d to the value of the integer variable.\n", atoi(cmd[1]));
+	temp_value = cpu.value;
 	cpu.value += atoi(cmd[1]);
+	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	
       }else if(!strcmp(cmd[0],"D")){
 	printf("Substract %d from the value of the integer variable.\n", atoi(cmd[1]));
+	temp_value = cpu.value;
 	cpu.value -= atoi(cmd[1]);
-      }else if(!strcmp(cmd[0],"B")){
+	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	
+      }else if(!strcmp(cmd[0],"B\n")){
 	printf("Block this simulated process.\n");
+	temp_state = dequeue(&running_states);
+	printf("pid=%d is blocked.\n", temp_state.pid);
+	enqueue(&blocked_states, temp_state);
+	// TODO: scheduling required.
+	
       }else if(!strcmp(cmd[0],"E\n")){
 	printf("Terminate this simulated process.\n");
+	temp_state = dequeue(&running_states);
+	printf("pid=%d is Terminated.\n", temp_state.pid);
+	// TODO: scheduling required.
+	
       }else if(!strcmp(cmd[0],"F")){
 	printf("Create a new simulated process at %d times.\n", atoi(cmd[1]));
 	arg = atoi(cmd[1]);
 	for(x=0; x<arg; x++){
-	  // create new processes.
+	  // TODO: create new processes.
 	  printf("Created a process with pid=%d.\n", pid_cnt);
 	  pid_cnt++;
 	}
@@ -232,37 +298,45 @@ void processManagerProcess(int rfd)
 	cpu.pc = 0;
 	for(x=0;x<MAX_LINE;x++){
 	  for(y=0;y<MAX_STR;y++){
-	    prog[x][y] = '\0';
+	    //prog[x][y] = '\0'; // Not tested
 	  }
 	}
-	readProgram(cmd[1], prog);
+	//readProgram(cmd[1], prog); // Not tested
 	
       }else{
 	printf("Unknown Instruction.");	
       }
+      
       free(cmd);
       time++;
       cpu.pc++;
       
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
-      if(get_que(&blocked_state) == NULL){
-	printf("There are no processes in BlockedState.");
+      temp_state = dequeue(&blocked_states);
+      if(temp_state.pid == -1){
+	printf("There are no states in blocked queue.\n");
       }else{
-	// unblock the process.
-	add_que(&ready_state, get_que(&blocked_state));
+	printf("pid=%d moves from blocked queue to ready queue.\n", temp_state.pid);
+	enqueue(&ready_states, temp_state);
       }
-
+      
     }else if(!strcmp(buffer, "P\n")){
       printf("Print the current state of the system.\n");
+      show("Running States: ", running_states);
+      show("Ready States: ", ready_states);
+      show("Blocked States: ", blocked_states);
+      
     }else if(!strcmp(buffer, "T\n")){
       printf("Print the average turnaround time, and terminate the system.\n");
-      //exit(1);
+      return;
+      
     }else{
       printf("Unknown command.\n");
     }
     //fputs(buffer, stdout);
-    
+
+    printf("\n");
     fflush(stdout);
   }
   fclose(fp);
