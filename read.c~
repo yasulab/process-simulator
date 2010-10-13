@@ -1,0 +1,31 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define STR_MAX 256 /* 文字列入力用配列長 */
+
+int main(void)
+{
+  FILE *fp;          /* ファイルポインタ用 */
+  char fname[80];    /* ファイル名用 */
+  char buff[STR_MAX], *pp;    /* 文字列用 */
+
+  printf("ファイル名 : ");    /* プロンプト表示 */
+  gets(fname);              /* ファイル名入力 */
+
+  fp = fopen(fname, "r");    /* ファイルオープン */
+  if(fp == NULL){            /* オープン失敗 */
+    printf("ファイルがオープンできません\n");
+    exit(1);               /* 強制終了 */
+  }
+
+  while(1){    /* 永久ループ */
+    pp = fgets(buff, STR_MAX, fp);    /* 1行読み込み */
+    if(pp == NULL){    /* 読み込み終了 */
+      break;           /* ループ脱出 */
+    }
+    printf("%s", buff);    /* 1行表示 */
+  }
+
+  fclose(fp);    /* ファイルクローズ */
+  return(0);
+}
