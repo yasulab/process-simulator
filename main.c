@@ -5,7 +5,7 @@
 #include <sys/wait.h>
 #include <string.h>
 
-#define MAX_STR 256 /* 文字列入力用配列長 */
+#define MAX_STR 256 
 #define MAX_LINE 30
 #define MAX_TABLE 30
 
@@ -15,7 +15,6 @@
 
 struct Cpu
 {
-  //int pointer;
   int pc;
   int pid;
   int value;
@@ -27,12 +26,13 @@ struct PcbTable
 {
   int pid;
   int ppid;
-  int pc;
+  int pc;    // Initially started from zero.
   int value;
   int priority;
   int state;
   int t_start;
-  int t_cpu;
+  int t_used;
+  char fname[MAX_STR]; // Extended Data Member to read a program
 };
 
 
@@ -123,7 +123,7 @@ void contextSwitch(struct Cpu *cpu, struct PcbTable *ptable){
   cpu->pid = ptable->pid;
   cpu->value = ptable->value;
   cpu->t_slice = ptable->t_start; // ???
-  cpu->t_remain = ptable->t_cpu; // ???
+  cpu->t_remain = ptable->t_used; // ???
 
   ptable->pc = temp.pc;
   ptable->pid = temp.pid;
@@ -132,30 +132,39 @@ void contextSwitch(struct Cpu *cpu, struct PcbTable *ptable){
   ptable->priority = 0; // ???
   ptable->state = READY; // ???
   ptable->t_start = temp.t_slice; // ???
-  ptable->t_cpu = temp.t_remain; // ???
+  ptable->t_used = temp.t_remain; // ???
 }
 
 int readProgram(char *fname, char prog[][MAX_STR]){
-  FILE *fp;          /* ファイルポインタ用 */
-  char buff[MAX_STR], *pp;    /* 文字列用 */
-  fp = fopen(fname, "r");    /* ファイルオープン */
-  if(fp == NULL){            /* オープン失敗 */
-    printf("ファイルがオープンできません\n");
-    exit(1);               /* 強制終了 */
+  FILE *fp;
+  char buff[MAX_STR], *pp;
+  int x, y;
+  
+  /* Initialize prog arrays */
+  for(x=0;x<MAX_LINE;x++){
+    for(y=0;y<MAX_STR;y++){
+      prog[x][y] = '\0'; // Not tested
+    }
+  }
+  
+  fp = fopen(fname, "r");
+  if(fp == NULL){
+    printf("Can't open the file: '$s'\n", fname);
+    exit(1);
   }
 
   int i=0;
-  while(1){    /* 永久ループ */
-    pp = fgets(buff, MAX_STR, fp);    /* 1行読み込み */
+  while(1){
+    pp = fgets(buff, MAX_STR, fp);
     strcpy(prog[i], buff);
-    if(pp == NULL){    /* 読み込み終了 */
-      break;           /* ループ脱出 */
+    if(pp == NULL){
+      break;
     }
-    //printf("%s", buff);    /* 1行表示 */
+    //printf("%s", buff);
     i++;
   }
 
-  fclose(fp);    /* ファイルクローズ */
+  fclose(fp);
   return(0);
 }
 
@@ -234,39 +243,48 @@ void reporterProcess(int time, QUE *s_run, QUE *s_ready, QUE *s_block){
 void processManagerProcess(int rfd)
 {
   FILE *fp = fdopen(rfd, "r");
-  char *fname = "init";
   char prog[MAX_LINE][MAX_STR];
   char **cmd;
-  int i=0;
-  int pid_cnt = 0;
+  int i;
+  int pid_cnt;
   int arg;
   int x,y; // iterators
-  struct PcbTable init_ptable;
   
-  /* ProcessManager's 6 Data Structures*/
+  
+  /* ProcessManager's 6+1 Data Structures*/
   int time;
   struct Cpu cpu;
-  struct PcbTable ptable[MAX_TABLE];
+  struct PcbTable ptable;
   QUE *ready_states;
   QUE *blocked_states;
   QUE *running_states;
   /**************************************/
 
   /* Initializing */
-  readProgram(fname, prog);
-  time = 0;
+  pid_cnt = 0;
+  Time = 0;
   cpu.pc = 0;
   cpu.value = 0;
-  //ptable[0].pid = pid_cnt;
+  
+  ptable.pid = pid_cnt++;
+  ptable.ppid = -1;
+  ptable.priority = 0;
+  ptable.pc = 0;
+  ptable.value = 0;
+  ptable.t_start = time;
+  ptable.t_used = time - ptable.t_start;
+  //ptable.fname[] = "init";
+  //strcpy("init", ptable.fname);
+  strcpy(ptable.fname, "init");
+  
+  readProgram(ptable.fname, prog);
   
   ready_states = NULL;
   blocked_states = NULL;
-  running_states = NULL; // ???
-  init_ptable.pid = pid_cnt;
-  enqueue(&running_states, init_ptable);
+  running_states = NULL; // TODO: Re-thinking if needed
+  enqueue(&running_states, ptable);
   /****************/
 
-  pid_cnt++;
 
   int n;
   struct PcbTable temp_ptable;
@@ -314,8 +332,9 @@ void processManagerProcess(int rfd)
       }else if(!strcmp(cmd[0], "F")){
 	printf("Create a new simulated process at %d times.\n", atoi(cmd[1]));
 	arg = atoi(cmd[1]);
+	// TODO: storeData(&cpu, &ptable);
 	for(x=0; x<arg; x++){
-	  // TODO: create new processes.
+  	  // TODO: create new processes.
 	  printf("Created a process with pid=%d.\n", pid_cnt);
 	  pid_cnt++;
 	}

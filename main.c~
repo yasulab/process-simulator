@@ -27,68 +27,88 @@ struct PcbTable
 {
   int pid;
   int ppid;
-  int pc;
+  int pc;    // Initially started from zero.
   int value;
   int priority;
   int state;
   int t_start;
-  int t_cpu;
+  int t_used;
+  char fname[MAX_STR]; // Extended Data Member to read a program
 };
 
-struct State{
-  int pid;
-};
 
-/*
-struct ReadyState{
-  int *next;
-  int pid[];
-};
-
-struct BlockedState{
-  int *next;
-  int pid[];
-};
-
-struct RunningState{
-  int pid;
-};
-*/
-  
 static char buffer[BUFSIZ];
 
-
 typedef struct Que {
-  struct Que *next;
-  struct State *state;
-}QUE;
-//static QUE *First;
+  struct PcbTable ptable;
+  struct Que *next; /* pointer to next element in list */
+} QUE;
 
-void *get_que(QUE *First){
-  QUE *lp = First;
-  struct State *state;
-  if(lp==NULL){    /* データがキューにない */
-    return NULL;
-  }
-  state = lp->state;
-  lp = lp->next;
-  free(First);
-  First=lp;
-  return state;
+/* Insert into a head */
+QUE *insert_head(QUE **p, struct PcbTable pt)
+{
+  QUE *n = (QUE *) malloc(sizeof(QUE));
+  if (n == NULL) return NULL;
+
+  n->next = *p;
+  *p = n;
+  n->ptable = pt;
+
+  return n;
 }
 
-void add_que(QUE *First, struct State *state){
-  QUE *lp=First;
-  if(lp!=NULL){
-    while(lp->next!=NULL){
-      lp=lp->next;
-    }
-    lp = lp->next = (QUE*)malloc(sizeof(QUE));
+/* Enque into a tail */
+QUE *enqueue(QUE **p, struct PcbTable pt)
+{
+  QUE *tail = *p;
+  //printf("pid=%d\n", s.pid);
+  if(*p == NULL) // For initial setup
+    return insert_head(p, pt);
+
+  while(tail->next != NULL) //tail refers to a tail node
+    tail = tail->next;
+
+  QUE *n = (QUE *) malloc(sizeof(QUE));
+  if (n == NULL)
+    return NULL;
+
+  n->next = tail->next;
+  tail->next = n;
+  n->ptable = pt;  // equivalent to 'tail->next->ptable = pt;'
+
+  return n;
+}
+
+/* Dequeue from a head */
+struct PcbTable dequeue(QUE **p){
+  struct PcbTable s;
+  s.pid = -1;
+  if (*p != NULL){
+    //printf("DEQ(pid=%d)\n", (*p)->ptable.pid);
+      s = (*p)->ptable;
+      QUE *n = *p;
+      *p = n->next;
+      free(n);
+      return s;
   }else{
-    lp = First=(QUE*)malloc(sizeof(QUE));
+    //printf("cannot remove, because queue is empty\n");
+    return s;
   }
-  lp->state = state;
-  lp->next = NULL;
+}
+
+/* Show a queue */
+void show(char *str, QUE *n)
+{
+  printf("%s", str);
+  if (n == NULL){
+    printf("queue is empty\n");
+    return ;
+  }
+  while (n != NULL){
+    printf("[%2d]", n->ptable.pid);
+    n = n->next;
+  }
+  printf("\n");
   return;
 }
 
@@ -104,7 +124,7 @@ void contextSwitch(struct Cpu *cpu, struct PcbTable *ptable){
   cpu->pid = ptable->pid;
   cpu->value = ptable->value;
   cpu->t_slice = ptable->t_start; // ???
-  cpu->t_remain = ptable->t_cpu; // ???
+  cpu->t_remain = ptable->t_used; // ???
 
   ptable->pc = temp.pc;
   ptable->pid = temp.pid;
@@ -113,30 +133,39 @@ void contextSwitch(struct Cpu *cpu, struct PcbTable *ptable){
   ptable->priority = 0; // ???
   ptable->state = READY; // ???
   ptable->t_start = temp.t_slice; // ???
-  ptable->t_cpu = temp.t_remain; // ???
+  ptable->t_used = temp.t_remain; // ???
 }
 
 int readProgram(char *fname, char prog[][MAX_STR]){
-  FILE *fp;          /* ファイルポインタ用 */
-  char buff[MAX_STR], *pp;    /* 文字列用 */
-  fp = fopen(fname, "r");    /* ファイルオープン */
-  if(fp == NULL){            /* オープン失敗 */
-    printf("ファイルがオープンできません\n");
-    exit(1);               /* 強制終了 */
+  FILE *fp;
+  char buff[MAX_STR], *pp;
+  int x, y;
+  
+  /* Initialize prog arrays */
+  for(x=0;x<MAX_LINE;x++){
+    for(y=0;y<MAX_STR;y++){
+      prog[x][y] = '\0'; // Not tested
+    }
+  }
+  
+  fp = fopen(fname, "r");
+  if(fp == NULL){
+    printf("Can't open the file: '$s'\n", fname);
+    exit(1);
   }
 
   int i=0;
-  while(1){    /* 永久ループ */
-    pp = fgets(buff, MAX_STR, fp);    /* 1行読み込み */
+  while(1){
+    pp = fgets(buff, MAX_STR, fp);
     strcpy(prog[i], buff);
-    if(pp == NULL){    /* 読み込み終了 */
-      break;           /* ループ脱出 */
+    if(pp == NULL){
+      break;
     }
-    //printf("%s", buff);    /* 1行表示 */
+    //printf("%s", buff);
     i++;
   }
 
-  fclose(fp);    /* ファイルクローズ */
+  fclose(fp);
   return(0);
 }
 
@@ -183,83 +212,131 @@ void commanderProcess(int wfd)
   }
 }
 
-/*
-void simulatedProcess(int rfd, int pid, char prog[][MAX_STR]){
-  FILE *fp = fdopen(rfd, "r");
-  int i=0, j, n;
-  while(strcmp(prog[i],"E\n")){
-    //printf("prog[%d]=%s", i, prog[i]);
-    cmd = split(&n, prog[i]);
-    
-    //printf("CMD=%s\tARGS=%s", cmd[0], cmd[1]);
-
-    i++;
-  }
-  printf("prog[%d]=%s", i, prog[i]);
-
-  //i=0;
+void reporterProcess(int time, QUE *s_run, QUE *s_ready, QUE *s_block){
+  printf("*********************************************\n");
+  printf("The current system state is as follows:\n");
+  printf("*********************************************\n");
+  printf("CURRENT TIME: %d\n", time);
+  printf("\n");
+  printf("RUNNING PROCESS:\n");
+  show("Running PcbTables: ", s_run);
+  //TODO: Formatting the data as following:
+  //pid, ppid, priority, value, start time, CPU time used so far
+  printf("\n");
+  printf("BLOCKED PROCESSES:\n");
+  show("Queue of blocked processes: ", s_block);
+  //TODO: Formatting the data as following:
+  //pid, ppid, priority, value, start time, CPU time used so far
+  printf("\n");
+  printf("PROCESSES READY TO EXECUTE:\n");
+  show("Queue of processes with priority 0: ", s_ready);
+  //TODO: Formatting the data as following:
+  //pid, ppid, value, start time, CPU time used so far
   
-  printf("*** pid=%d was exit. ***\n", pid);
+  //show("Queue of processes with priority 1: ", s_ready);
+  // ...
+  //show("Queue of processes with priority 3: ", s_ready);
+  printf("Terminated Reporter Process.\n");
+  printf("\n");
+  exit(3);
 }
-*/
 
 void processManagerProcess(int rfd)
 {
   FILE *fp = fdopen(rfd, "r");
-  char *fname = "init";
   char prog[MAX_LINE][MAX_STR];
   char **cmd;
-  int i=0;
-  int pid_cnt = 0;
+  int i;
+  int pid_cnt;
   int arg;
   int x,y; // iterators
-
+  
+  
   /* ProcessManager's 6 Data Structures*/
   int time;
   struct Cpu cpu;
-  struct PcbTable ptable[MAX_TABLE];
-  QUE ready_state;
-  QUE blocked_state;
-  struct State running_state;
+  struct PcbTable ptable;
+  QUE *ready_states;
+  QUE *blocked_states;
+  QUE *running_states;
   /**************************************/
 
   /* Initializing */
-  readProgram(fname, prog);
+  pid_cnt = 0;
   time = 0;
   cpu.pc = 0;
   cpu.value = 0;
-  ptable[0].pid = pid_cnt;
-  running_state.pid = 0;
+  
+  ptable.pid = pid_cnt++;
+  ptable.ppid = -1;
+  ptable.priority = 0;
+  ptable.pc = 0;
+  ptable.value = 0;
+  ptable.t_start = time;
+  ptable.t_used = time - ptable.t_start;
+  //ptable.fname[] = "init";
+  //strcpy("init", ptable.fname);
+  strcpy(ptable.fname, "init");
+  
+  readProgram(ptable.fname, prog);
+  
+  ready_states = NULL;
+  blocked_states = NULL;
+  running_states = NULL; // TODO: Re-thinking if needed
+  enqueue(&running_states, ptable);
   /****************/
 
-  pid_cnt++;
 
   int n;
+  struct PcbTable temp_ptable;
+  int temp_value;
+  int temp_pid;
+  
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
-    printf("buffer=%s",buffer);
+    printf("Instruction=%s",buffer);
     if(!strcmp(buffer, "Q\n")){
       printf("End of one unit of time.\n");
       cmd = split(&n, prog[cpu.pc]);
       printf("cmd[0]=%s\n",cmd[0]);
       
-      if(!strcmp(cmd[0],"S")){
+      if(!strcmp(cmd[0], "S")){
 	printf("Set the value of the integer variable to %d.\n", atoi(cmd[1]));
+	temp_value = cpu.value;
 	cpu.value = atoi(cmd[1]);
-      }else if(!strcmp(cmd[0],"A")){
+	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	
+      }else if(!strcmp(cmd[0], "A")){
 	printf("Add %d to the value of the integer variable.\n", atoi(cmd[1]));
+	temp_value = cpu.value;
 	cpu.value += atoi(cmd[1]);
-      }else if(!strcmp(cmd[0],"D")){
+	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	
+      }else if(!strcmp(cmd[0], "D")){
 	printf("Substract %d from the value of the integer variable.\n", atoi(cmd[1]));
+	temp_value = cpu.value;
 	cpu.value -= atoi(cmd[1]);
-      }else if(!strcmp(cmd[0],"B")){
+	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	
+      }else if(!strcmp(cmd[0], "B\n")){
 	printf("Block this simulated process.\n");
-      }else if(!strcmp(cmd[0],"E\n")){
+	temp_ptable = dequeue(&running_states);
+	printf("pid=%d is blocked.\n", temp_ptable.pid);
+	enqueue(&blocked_states, temp_ptable);
+	// TODO: scheduling required.
+	
+      }else if(!strcmp(cmd[0], "E\n")){
 	printf("Terminate this simulated process.\n");
-      }else if(!strcmp(cmd[0],"F")){
+	temp_ptable = dequeue(&running_states);
+	printf("pid=%d is Terminated.\n", temp_ptable.pid);
+	// TODO: scheduling required.
+	
+      }else if(!strcmp(cmd[0], "F")){
 	printf("Create a new simulated process at %d times.\n", atoi(cmd[1]));
 	arg = atoi(cmd[1]);
+	// TODO: storeData(&cpu, &ptable);
 	for(x=0; x<arg; x++){
-	  // create new processes.
+  	  // TODO: create new processes.
+	  printf("Created a process with pid=%d.\n", pid_cnt);
 	  pid_cnt++;
 	}
 	
@@ -268,37 +345,48 @@ void processManagerProcess(int rfd)
 	cpu.pc = 0;
 	for(x=0;x<MAX_LINE;x++){
 	  for(y=0;y<MAX_STR;y++){
-	    prog[x][y] = '\0';
+	    //prog[x][y] = '\0'; // Not tested
 	  }
 	}
-	readProgram(cmd[1], prog);
+	//readProgram(cmd[1], prog); // Not tested
 	
       }else{
 	printf("Unknown Instruction.");	
       }
+      
       free(cmd);
       time++;
       cpu.pc++;
       
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
-      if(get_que(&blocked_state) == NULL){
-	printf("There are no processes in BlockedState.");
+      temp_ptable = dequeue(&blocked_states);
+      if(temp_ptable.pid == -1){
+	printf("There are no states in blocked queue.\n");
       }else{
-	// unblock the process.
-	add_que(&ready_state, get_que(&blocked_state));
+	printf("pid=%d moves from blocked queue to ready queue.\n", temp_ptable.pid);
+	enqueue(&ready_states, temp_ptable);
       }
-
+      
     }else if(!strcmp(buffer, "P\n")){
       printf("Print the current state of the system.\n");
+      if ((temp_pid = fork()) == -1) {
+	perror("fork");
+      } else if (temp_pid == 0) {
+	reporterProcess(time, running_states, ready_states, blocked_states);
+      } else {
+	// Do nohing.
+      }      
     }else if(!strcmp(buffer, "T\n")){
       printf("Print the average turnaround time, and terminate the system.\n");
-      //exit(1);
+      return;
+      
     }else{
       printf("Unknown command.\n");
     }
     //fputs(buffer, stdout);
-    
+
+    printf("\n");
     fflush(stdout);
   }
   fclose(fp);
