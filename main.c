@@ -188,10 +188,11 @@ void cpu2ptable(struct Cpu *cpu, struct PcbTable *ptable){
   //ptable->t_used =
   return;
 }
+
 int readProgram(char *fname, char prog[][MAX_STR]){
   FILE *fp;
   char buff[MAX_STR], *pp;
-  int x, y;
+  int x, y, i, j;
   
   /* Initialize program arrays */
   for(x=0;x<MAX_LINE;x++){
@@ -199,21 +200,30 @@ int readProgram(char *fname, char prog[][MAX_STR]){
       prog[x][y] = '\0'; // Not tested
     }
   }
-  
+
   fp = fopen(fname, "r");
   if(fp == NULL){
-    printf("Can't open the file: '$s'\n", fname);
+    printf("Can't open the file: '%s'\n", fname);
     exit(1);
   }
 
-  int i=0;
+  i=0;
+  if(DEBUG) printf("Read '%s' program:\n", fname);
   while(1){
     pp = fgets(buff, MAX_STR, fp);
+    
+    // delete '\n' character if exists.
+    j=0;
+    while(buff[j] != '\0'){
+      if(buff[j] == '\n') buff[j] = '\0';
+      j++;
+    }
+  
     strcpy(prog[i], buff);
     if(pp == NULL){
       break;
     }
-    //printf("%s", buff);
+    if(DEBUG) printf("%3d: '%s'\n", i, buff);
     i++;
   }
 
@@ -334,6 +344,7 @@ void processManagerProcess(int rfd)
   struct PcbTable temp_ptable;
   int temp_value;
   int temp_pid;
+  char temp_fname[MAX_STR];
   
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
     printf("Instruction=%s",buffer);
@@ -360,7 +371,7 @@ void processManagerProcess(int rfd)
 	cpu.value -= atoi(cmd[1]);
 	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
 	
-      }else if(!strcmp(cmd[0], "B\n")){
+      }else if(!strcmp(cmd[0], "B")){
 	printf("Block this simulated process.\n");
 	// Store CPU data to ptable
 	temp_ptable = dequeue(&running_states);
@@ -369,7 +380,7 @@ void processManagerProcess(int rfd)
 	enqueue(&blocked_states, temp_ptable);
 	// TODO: scheduling required.
 	
-      }else if(!strcmp(cmd[0], "E\n")){
+      }else if(!strcmp(cmd[0], "E")){
 	printf("Terminate this simulated process.\n");
 	temp_ptable = dequeue(&running_states);
 	printf("pid=%d is Terminated.\n", temp_ptable.pid);
@@ -387,18 +398,20 @@ void processManagerProcess(int rfd)
 	  enqueue(&ready_states, temp_ptable);
 	  printf("Created a process with pid=%d.\n", pid_cnt-1);
 	}
+	// Not necessary to schdule processes.
 	
       }else if(!strcmp(cmd[0],"R")){
 	printf("Replace the program of the simulated process with the program in the file '%s'.\n", cmd[1]);
-	
-	cpu.pc = 0;
+	strcpy(temp_fname, cmd[1]);
+	cpu.pc = -1;
 	cpu.value = 0;
 	for(x=0;x<MAX_LINE;x++){
 	  for(y=0;y<MAX_STR;y++){
-	    //ptable.prog[x][y] = '\0'; // Not tested
+	    ptable.prog[x][y] = '\0'; // Not tested
 	  }
 	}
-	//readProgram(cmd[1], ptable.prog); // Not tested
+	readProgram(temp_fname, ptable.prog); // Not tested
+	printf("Replaced the current program with the program in '%s' file.\n", temp_fname);
 	
       }else{
 	printf("Unknown Instruction.");	
