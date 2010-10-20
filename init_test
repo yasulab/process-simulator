@@ -1,11 +1,11 @@
 S 1000
 A 19
 F 1
+B
 A 20
 D 53
 A 55
 R file_a
-B
 F 1
 R file_b
 F 1

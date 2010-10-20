@@ -316,6 +316,7 @@ char **split(int *n, char *string)
 
 void copy(FILE *fin, FILE *fout)
 {
+  printf("> ");
   while (fgets(buffer, BUFSIZ, fin) != NULL) {
     fputs(buffer, fout);
     fflush(fout);
@@ -332,17 +333,16 @@ void commanderProcess(int wfd)
     perror("parent: fdopen");
     exit(3);
   }
-  
   copy(stdin, fp);
   fclose(fp);
 
-  if (wait(&status) == -1) {
+  if(wait(&status) == -1) {
     perror("wait");
     exit(4);
   }
 }
 
-void reporterProcess(struct Proc pcbTable[], int time,
+void reporterProcess(int wfd, struct Proc pcbTable[], int time,
 		     QUE *s_run, QUE *s_ready, QUE *s_block){
   printf("*********************************************\n");
   printf("The current system state is as follows:\n");
@@ -370,19 +370,21 @@ void reporterProcess(struct Proc pcbTable[], int time,
   // ...
   //show("Queue of processes with priority 3: ", s_ready);
   printf("Terminated Reporter Process.\n");
-  printf("\n");
+  close(wfd); // Pipe Synchronized.
   exit(3);
 }
 
 void processManagerProcess(int rfd)
 {
   FILE *fp = fdopen(rfd, "r");
+  int fd[2];
   //char prog[MAX_LINE][MAX_STR];
   char **cmd;
-  int i;
+  int i, c;
   int pid_count;
   int arg;
   int x,y; // iterators
+  int wait4unblocking = false;
   
   
   /* ProcessManager's 6 Data Structures*/
@@ -432,6 +434,14 @@ void processManagerProcess(int rfd)
     
     printf("Instruction = %s",buffer);
     if(!strcmp(buffer, "Q\n")){
+      if(wait4unblocking == true){
+	free(cmd);
+	printf("\n");
+	printf("> ");
+	fflush(stdout);
+	continue;
+      }
+	
       printf("End of one unit of time.\n");
       printf("Command = '%s'\n", pcbTable[cpu.pid].prog[cpu.pc]);
       cmd = split(&n, pcbTable[cpu.pid].prog[cpu.pc]);
@@ -510,14 +520,21 @@ void processManagerProcess(int rfd)
 
       /*** Do scheduling ***/
       //sched();
+      
       if(ready_states == NULL){ // No processes in the Ready queue, so skipped.
-	printf("No ready processes, so continue to run the current process.\n");
-	if(running_states == NULL){ // No process running: finished execution.
+	if(running_states != NULL){
+	  printf("No ready processes, so continue to run the current process.\n");
+	}else if(blocked_states != NULL){
+	  printf("Only blocked processes remain, so waiting for unblocking.\n");
+	  wait4unblocking = true;
+	}else{
+	  // All processes were finished -> finished execution.
 	  printf("Program was successfully executed.\n");
 	  printf("=== END OF PRORAM ===\n");
 	  return;
 	}
-	
+	  
+	  
       }else if(running_states == NULL){ // When process was blocked or terminated.
 	printf("There are no process running, so assign the first process in the queue to CPU.\n");
 	temp_pid = dequeue(&ready_states);
@@ -556,29 +573,36 @@ void processManagerProcess(int rfd)
       }else{
 	printf("pid=%d moves from blocked queue to ready queue.\n", temp_index);
 	enqueue(&ready_states, temp_index);
+	wait4unblocking = false;
       }
       
     }else if(!strcmp(buffer, "P\n")){
       printf("Print the current state of the system.\n");
-      if ((temp_pid = fork()) == -1) {
+      if (pipe(fd)) {
+	perror("pipe");
+      } else if ((temp_pid = fork()) == -1) {
 	perror("fork");
       } else if (temp_pid == 0) {
+	close(fd[0]);
 	if(DEBUG) cpu2proc(&cpu, &pcbTable[cpu.pid]);
-	reporterProcess(pcbTable, current_time,
+	reporterProcess(fd[1], pcbTable, current_time,
 			running_states, ready_states, blocked_states);
       } else {
-	// Do nohing.
-      }      
+	close(fd[1]);
+	while(i=(read(fd[0],&c,1)) > 0); // Pipe Synchronization
+      }
+      
     }else if(!strcmp(buffer, "T\n")){
       printf("Print the average turnaround time, and terminate the system.\n");
+      // TODO: Implemente calculatting functions.
       return;
       
     }else{
       printf("Unknown command.\n");
     }
     //fputs(buffer, stdout);
-
     printf("\n");
+    printf("> ");
     fflush(stdout);
   }
   fclose(fp);
