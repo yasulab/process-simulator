@@ -8,6 +8,7 @@
 #define MAX_STR 256 
 #define MAX_LINE 30
 #define MAX_TABLE 30
+#define MAX_PROCS 256
 
 #define BLOCK 0
 #define READY 1
@@ -32,7 +33,7 @@ struct Cpu
   int t_remain;
 };
 
-struct PcbTable
+struct Proc
 {
   int pid;
   int ppid;
@@ -51,30 +52,32 @@ char buffer[BUFSIZ];
 //int pid_cnt;
 
 typedef struct Que {
-  struct PcbTable ptable;
+  int pt_index;
+  struct Proc proc;
   struct Que *next; /* pointer to next element in list */
 } QUE;
 
 /* Insert into a head */
-QUE *insert_head(QUE **p, struct PcbTable pt)
+QUE *insert_head(QUE **p, int pt_index)
 {
   QUE *n = (QUE *) malloc(sizeof(QUE));
   if (n == NULL) return NULL;
 
   n->next = *p;
   *p = n;
-  n->ptable = pt;
+  //n->proc = pt;
+  n->pt_index = pt_index;
 
   return n;
 }
 
 /* Enque into a tail */
-QUE *enqueue(QUE **p, struct PcbTable pt)
+QUE *enqueue(QUE **p, int pt_index)
 {
   QUE *tail = *p;
   //printf("pid=%d\n", s.pid);
   if(*p == NULL) // For initial setup
-    return insert_head(p, pt);
+    return insert_head(p, pt_index);
 
   while(tail->next != NULL) //tail refers to a tail node
     tail = tail->next;
@@ -85,46 +88,48 @@ QUE *enqueue(QUE **p, struct PcbTable pt)
 
   n->next = tail->next;
   tail->next = n;
-  n->ptable = pt;  // equivalent to 'tail->next->ptable = pt;'
+  //n->proc = pt;  // equivalent to 'tail->next->proc = pt;'
+  n->pt_index = pt_index;
 
   return n;
 }
 
 /* Dequeue from a head */
-struct PcbTable dequeue(QUE **p){
-  struct PcbTable s;
-  s.pid = -1;
+int dequeue(QUE **p){
+  //struct Proc s;
+  //s.pid = -1;
+  int pt_index = -1;
   if (*p != NULL){
-    //printf("DEQ(pid=%d)\n", (*p)->ptable.pid);
-      s = (*p)->ptable;
+    //printf("DEQ(pid=%d)\n", (*p)->proc.pid);
+      pt_index = (*p)->pt_index;
       QUE *n = *p;
       *p = n->next;
       free(n);
-      return s;
+      return pt_index;
   }else{
     //printf("cannot remove, because queue is empty\n");
-    return s;
+    return pt_index;
   }
 }
 
-struct PcbTable create_ptable(int pid, int ppid, int priority, int pc, int value,
-			      int t_start, int t_used, char *fname){
-  static struct PcbTable ptable;
-  ptable.pid = pid;
-  ptable.ppid = ppid;
-  ptable.priority = priority;
-  ptable.pc = pc;
-  ptable.value = value;
-  ptable.t_start = t_start;
-  ptable.t_used = t_used;
-  strcpy(ptable.fname, fname);  
-  readProgram(ptable.fname, ptable.prog);
-  return ptable;
+struct Proc create_proc(int pid, int ppid, int priority, int pc, int value,
+			int t_start, int t_used, char *fname){
+  static struct Proc proc;
+  proc.pid = pid;
+  proc.ppid = ppid;
+  proc.priority = priority;
+  proc.pc = pc;
+  proc.value = value;
+  proc.t_start = t_start;
+  proc.t_used = t_used;
+  strcpy(proc.fname, fname);  
+  readProgram(proc.fname, proc.prog);
+  return proc;
 }
 
-struct PcbTable dup_ptable(struct PcbTable *pp, int new_pid,
-			   int dup_times, int current_time){
-  static struct PcbTable cp;
+struct Proc dup_proc(struct Proc *pp, int new_pid,
+		     int dup_times, int current_time){
+  static struct Proc cp;
   cp.pid = new_pid;
   cp.ppid = pp->pid;
   cp.priority = pp->priority;
@@ -139,25 +144,26 @@ struct PcbTable dup_ptable(struct PcbTable *pp, int new_pid,
 } 
 
 /* Show a queue */
-void show(QUE *n){
-  //struct PcbTable *p;
-  //*p = n->ptable;
+void show(QUE *n, struct Proc pcbTable[]){
+  struct Proc proc;
+  
   if (n == NULL){
     printf("queue is empty\n");
     return ;
   }
   while (n != NULL){
+    proc = pcbTable[n->pt_index];
     printf("pid, ppid, priority, value, start time, CPU time used so far\n");
     printf("%3d,  %3d, %8d, %5d, %10d, %3d\n",
-	   n->ptable.pid, n->ptable.ppid, n->ptable.priority,
-	   n->ptable.value, n->ptable.t_start, n->ptable.t_used);
+	   proc.pid, proc.ppid, proc.priority,
+	   proc.value, proc.t_start, proc.t_used);
     n = n->next;
   }
   printf("\n");
   return;
 }
 
-void contextSwitch(struct Cpu *cpu, struct PcbTable *ptable){
+void contextSwitch(struct Cpu *cpu, struct Proc *proc){
   struct Cpu temp;
   temp.pc = cpu->pc;
   temp.pid = cpu->pid;
@@ -165,28 +171,28 @@ void contextSwitch(struct Cpu *cpu, struct PcbTable *ptable){
   temp.t_slice = cpu->t_slice;
   temp.t_remain = cpu->t_remain;
 
-  cpu->pc =  ptable->pc;
-  cpu->pid = ptable->pid;
-  cpu->value = ptable->value;
-  cpu->t_slice = ptable->t_start; // ???
-  cpu->t_remain = ptable->t_used; // ???
+  cpu->pc =  proc->pc;
+  cpu->pid = proc->pid;
+  cpu->value = proc->value;
+  cpu->t_slice = proc->t_start; // ???
+  cpu->t_remain = proc->t_used; // ???
 
-  ptable->pc = temp.pc;
-  ptable->pid = temp.pid;
-  ptable->ppid = 0; // ???
-  ptable->value = temp.value;
-  ptable->priority = 0; // ???
-  ptable->state = READY; // ???
-  ptable->t_start = temp.t_slice; // ???
-  ptable->t_used = temp.t_remain; // ???
+  proc->pc = temp.pc;
+  proc->pid = temp.pid;
+  proc->ppid = 0; // ???
+  proc->value = temp.value;
+  proc->priority = 0; // ???
+  proc->state = READY; // ???
+  proc->t_start = temp.t_slice; // ???
+  proc->t_used = temp.t_remain; // ???
 }
 
-void cpu2ptable(struct Cpu *cpu, struct PcbTable *ptable){
-  ptable->pc = cpu->pc;
-  ptable->pid = cpu->pid;
-  ptable->value = cpu->value;
-  // ptable->t_start =
-  //ptable->t_used =
+void cpu2proc(struct Cpu *cpu, struct Proc *proc){
+  proc->pc = cpu->pc;
+  proc->pid = cpu->pid;
+  proc->value = cpu->value;
+  // proc->t_start =
+  //proc->t_used =
   return;
 }
 
@@ -275,26 +281,27 @@ void commanderProcess(int wfd)
   }
 }
 
-void reporterProcess(int time, QUE *s_run, QUE *s_ready, QUE *s_block){
+void reporterProcess(struct Proc pcbTable[], int time,
+		     QUE *s_run, QUE *s_ready, QUE *s_block){
   printf("*********************************************\n");
   printf("The current system state is as follows:\n");
   printf("*********************************************\n");
   printf("CURRENT TIME: %d\n", time);
   printf("\n");
   printf("RUNNING PROCESS:\n");
-  show(s_run);
+  show(s_run, pcbTable);
   //TODO: Formatting the data as following:
   //pid, ppid, priority, value, start time, CPU time used so far
   printf("\n");
   printf("BLOCKED PROCESSES:\n");
   printf("Queue of blocked processes:\n");
-  show(s_block);
+  show(s_block, pcbTable);
   //TODO: Formatting the data as following:
   //pid, ppid, priority, value, start time, CPU time used so far
   printf("\n");
   printf("PROCESSES READY TO EXECUTE:\n");
   printf("Queue of processes with priority 0:\n");
-  show(s_ready);
+  show(s_ready, pcbTable);
   //TODO: Formatting the data as following:
   //pid, ppid, value, start time, CPU time used so far
   
@@ -312,47 +319,54 @@ void processManagerProcess(int rfd)
   //char prog[MAX_LINE][MAX_STR];
   char **cmd;
   int i;
-  int pid_cnt;
+  int pid_count;
   int arg;
   int x,y; // iterators
   
   
-  /* ProcessManager's 6+1 Data Structures*/
+  /* ProcessManager's 6 Data Structures*/
   int current_time;
   struct Cpu cpu;
-  struct PcbTable ptable;
+  //struct Proc proc; // Now fixing to the data structure below.
+  struct Proc pcbTable[MAX_PROCS];
+  int pt_index, pt_count;
   QUE *ready_states;
   QUE *blocked_states;
   QUE *running_states;
   /**************************************/
 
   /* Initializing */
-  pid_cnt = 0;
+  pid_count = 0;
   current_time = 0;
   cpu.pc = 0;
   cpu.value = 0;
 
-  ptable = create_ptable(pid_cnt++, -1, 0, 0, 0, current_time, 0, "init_test");
+  pt_index = 0;
+  pcbTable[pt_count++] = create_proc(pid_count++, -1, 0, 0, 0,
+				     current_time, 0, "init_test");
   
   ready_states = NULL;
   blocked_states = NULL;
   running_states = NULL; // TODO: Re-thinking if needed
-  enqueue(&running_states, ptable);
+  enqueue(&running_states, pt_index);
   /****************/
-
+  if(DEBUG) show(running_states, pcbTable);
 
   int n;
-  struct PcbTable temp_ptable;
+  struct Proc temp_proc;
   int temp_value;
   int temp_pid;
   char temp_fname[MAX_STR];
+  int temp_index;
   
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
     
     printf("Instruction=%s",buffer);
     if(!strcmp(buffer, "Q\n")){
       printf("End of one unit of time.\n");
-      cmd = split(&n, ptable.prog[cpu.pc]);
+      if(DEBUG) printf("Next line: %s\n", pcbTable[cpu.pid].prog[cpu.pc]);
+      if(DEBUG) printf("pt_index = %d\n", pt_index);
+      cmd = split(&n, pcbTable[pt_index].prog[cpu.pc]);
       current_time++;
       cpu.pc++;
       printf("cmd[0]=%s\n",cmd[0]);
@@ -377,17 +391,17 @@ void processManagerProcess(int rfd)
 	
       }else if(!strcmp(cmd[0], "B")){
 	printf("Block this simulated process.\n");
-	// Store CPU data to ptable
-	temp_ptable = dequeue(&running_states);
-	cpu2ptable(&cpu, &temp_ptable);
-	printf("Running Process(pid=%d) was blocked.\n", temp_ptable.pid);
-	enqueue(&blocked_states, temp_ptable);
+	// Store CPU data to proc
+	dequeue(&running_states); 
+	cpu2proc(&cpu, &pcbTable[pt_index]);
+	printf("Running Process(pid=%d) was blocked.\n", pcbTable[pt_index].pid);
+	enqueue(&blocked_states, pt_index);
 	// TODO: scheduling required.
 	
       }else if(!strcmp(cmd[0], "E")){
 	printf("Terminate this simulated process.\n");
-	temp_ptable = dequeue(&running_states);
-	printf("pid=%d is Terminated.\n", temp_ptable.pid);
+	dequeue(&running_states);
+	printf("pid=%d is Terminated.\n", pcbTable[pt_index].pid);
 	// TODO: scheduling required.
 	
       }else if(!strcmp(cmd[0], "F")){
@@ -395,13 +409,13 @@ void processManagerProcess(int rfd)
 	arg = atoi(cmd[1]);
 
 	cpu.pc += arg; // Execute N instructions after the next instruction. 
-	cpu2ptable(&cpu, &ptable);
-	/* Duplicate a ptable and enqueue it into Ready states list. */
+	cpu2proc(&cpu, &pcbTable[pt_index]);
+	/* Duplicate a proc and enqueue it into Ready states list. */
 	for(x=0; x<arg; x++){
   	  // create new processes.
-	  temp_ptable = dup_ptable(&ptable, pid_cnt++, arg, current_time);
-	  enqueue(&ready_states, temp_ptable);
-	  printf("Created a process with pid=%d.\n", pid_cnt-1);
+	  pcbTable[pt_count++] = dup_proc(&pcbTable[pt_index], pid_count++, arg, current_time);
+	  enqueue(&ready_states, pt_count-1);
+	  printf("Created a process with pid=%d.\n", pid_count-1);
 	}
 	// Not necessary to schdule processes.
 	
@@ -412,10 +426,10 @@ void processManagerProcess(int rfd)
 	cpu.value = 0;
 	for(x=0;x<MAX_LINE;x++){
 	  for(y=0;y<MAX_STR;y++){
-	    ptable.prog[x][y] = '\0'; // Not tested
+	    pcbTable[pt_index].prog[x][y] = '\0'; // Not tested
 	  }
 	}
-	readProgram(temp_fname, ptable.prog); // Not tested
+	readProgram(temp_fname, pcbTable[pt_index].prog); // Not tested
 	printf("Replaced the current program with the program in '%s' file.\n", temp_fname);
 	
       }else{
@@ -425,12 +439,12 @@ void processManagerProcess(int rfd)
       
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
-      temp_ptable = dequeue(&blocked_states);
-      if(temp_ptable.pid == -1){
+      temp_index = dequeue(&blocked_states);
+      if(temp_index == -1){
 	printf("There are no states in blocked queue.\n");
       }else{
-	printf("pid=%d moves from blocked queue to ready queue.\n", temp_ptable.pid);
-	enqueue(&ready_states, temp_ptable);
+	printf("pid=%d moves from blocked queue to ready queue.\n", temp_index);
+	enqueue(&ready_states, temp_index);
       }
       
     }else if(!strcmp(buffer, "P\n")){
@@ -438,7 +452,8 @@ void processManagerProcess(int rfd)
       if ((temp_pid = fork()) == -1) {
 	perror("fork");
       } else if (temp_pid == 0) {
-	reporterProcess(current_time, running_states, ready_states, blocked_states);
+	reporterProcess(pcbTable, current_time,
+			running_states, ready_states, blocked_states);
       } else {
 	// Do nohing.
       }      
