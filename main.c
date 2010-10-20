@@ -122,13 +122,14 @@ struct PcbTable create_ptable(int pid, int ppid, int priority, int pc, int value
   return ptable;
 }
 
-struct PcbTable dup_ptable(struct PcbTable *pp, int new_pid, int current_time){
+struct PcbTable dup_ptable(struct PcbTable *pp, int new_pid,
+			   int dup_times, int current_time){
   static struct PcbTable cp;
   cp.pid = new_pid;
   cp.ppid = pp->pid;
   cp.priority = pp->priority;
-  cp.pc = pp->pc;
-  cp.pc = cp.pc + 1; // Next instruction will be executed.
+  cp.pc = pp->pc;  // Execute the instruction immediately after F instruction.
+  //cp.pc = cp.pc + 1;
   cp.value = pp->value;
   cp.t_start = current_time;
   cp.t_used = 0;
@@ -347,10 +348,13 @@ void processManagerProcess(int rfd)
   char temp_fname[MAX_STR];
   
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
+    
     printf("Instruction=%s",buffer);
     if(!strcmp(buffer, "Q\n")){
       printf("End of one unit of time.\n");
       cmd = split(&n, ptable.prog[cpu.pc]);
+      current_time++;
+      cpu.pc++;
       printf("cmd[0]=%s\n",cmd[0]);
       
       if(!strcmp(cmd[0], "S")){
@@ -389,12 +393,13 @@ void processManagerProcess(int rfd)
       }else if(!strcmp(cmd[0], "F")){
 	printf("Create %d new simulated process(es).\n", atoi(cmd[1]));
 	arg = atoi(cmd[1]);
-	
+
+	cpu.pc += arg; // Execute N instructions after the next instruction. 
 	cpu2ptable(&cpu, &ptable);
 	/* Duplicate a ptable and enqueue it into Ready states list. */
 	for(x=0; x<arg; x++){
   	  // create new processes.
-	  temp_ptable = dup_ptable(&ptable, pid_cnt++, current_time);
+	  temp_ptable = dup_ptable(&ptable, pid_cnt++, arg, current_time);
 	  enqueue(&ready_states, temp_ptable);
 	  printf("Created a process with pid=%d.\n", pid_cnt-1);
 	}
@@ -403,7 +408,7 @@ void processManagerProcess(int rfd)
       }else if(!strcmp(cmd[0],"R")){
 	printf("Replace the program of the simulated process with the program in the file '%s'.\n", cmd[1]);
 	strcpy(temp_fname, cmd[1]);
-	cpu.pc = -1;
+	cpu.pc = 0;
 	cpu.value = 0;
 	for(x=0;x<MAX_LINE;x++){
 	  for(y=0;y<MAX_STR;y++){
@@ -415,11 +420,8 @@ void processManagerProcess(int rfd)
 	
       }else{
 	printf("Unknown Instruction.");	
-      }
-      
+      }      
       free(cmd);
-      current_time++;
-      cpu.pc++;
       
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
