@@ -369,7 +369,7 @@ void reporterProcess(int wfd, struct Proc pcbTable[], int time,
   //show("Queue of processes with priority 1: ", s_ready);
   // ...
   //show("Queue of processes with priority 3: ", s_ready);
-  printf("Terminated Reporter Process.\n");
+  //printf("Terminated Reporter Process.\n");
   close(wfd); // Pipe Synchronized.
   exit(3);
 }
@@ -435,7 +435,7 @@ void processManagerProcess(int rfd)
     printf("Instruction = %s",buffer);
     if(!strcmp(buffer, "Q\n")){
       if(wait4unblocking == true){
-	free(cmd);
+	printf("Only blocked processes remain, so waiting for unblocking.\n");
 	printf("\n");
 	printf("> ");
 	fflush(stdout);
@@ -594,7 +594,22 @@ void processManagerProcess(int rfd)
       
     }else if(!strcmp(buffer, "T\n")){
       printf("Print the average turnaround time, and terminate the system.\n");
-      // TODO: Implemente calculatting functions.
+      // TODO: Implemente calculatting the function to average turnaround time.
+      if (pipe(fd)) {
+	perror("pipe");
+      } else if ((temp_pid = fork()) == -1) {
+	perror("fork");
+      } else if (temp_pid == 0) {
+	close(fd[0]);
+	if(DEBUG) cpu2proc(&cpu, &pcbTable[cpu.pid]);
+	reporterProcess(fd[1], pcbTable, current_time,
+			running_states, ready_states, blocked_states);
+      } else {
+	close(fd[1]);
+	while(i=(read(fd[0],&c,1)) > 0); // Pipe Synchronization
+      }
+      printf("\n");
+      printf("Terminate the system.\n");
       return;
       
     }else{
