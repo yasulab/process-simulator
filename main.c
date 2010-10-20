@@ -19,10 +19,10 @@
 #define false 0
 
 /* Priority Hierarchy */
-#define HIGH 0
-#define MED_HIGH 1
-#define MED_LOW 2
-#define LOW 3
+#define CLASS_0 0
+#define CLASS_1 1
+#define CLASS_2 2
+#define CLASS_3 3
 
 struct Cpu
 {
@@ -48,6 +48,7 @@ struct Proc
 };
 
 char buffer[BUFSIZ];
+int quantum[4];
 //int time;
 //int pid_cnt;
 
@@ -65,7 +66,7 @@ QUE *insert_head(QUE **p, int pid)
 
   n->next = *p;
   *p = n;
-  //n->proc = pt;
+
   n->pid = pid;
 
   return n;
@@ -88,7 +89,6 @@ QUE *enqueue(QUE **p, int pid)
 
   n->next = tail->next;
   tail->next = n;
-  //n->proc = pt;  // equivalent to 'tail->next->proc = pt;'
   n->pid = pid;
 
   return n;
@@ -134,7 +134,7 @@ struct Proc dup_proc(struct Proc *pp, int new_pid,
   cp.ppid = pp->pid;
   cp.priority = pp->priority;
   cp.pc = pp->pc;  // Execute the instruction immediately after F instruction.
-  //cp.pc = cp.pc + 1;
+  //cp.pc = cp.pc - 1;
   cp.value = pp->value;
   cp.t_start = current_time;
   cp.t_used = 0;
@@ -153,9 +153,9 @@ void show(QUE *n, struct Proc pcbTable[]){
   }
   while (n != NULL){
     proc = pcbTable[n->pid];
-    printf("pid, ppid, priority, value, start time, CPU time used so far\n");
-    printf("%3d,  %3d, %8d, %5d, %10d, %3d\n",
-	   proc.pid, proc.ppid, proc.priority,
+    printf("pc, pid, ppid, priority, value, start time, CPU time used so far\n");
+    printf("%2d, %3d,  %3d, %8d, %5d, %10d, %3d\n",
+	   proc.pc, proc.pid, proc.ppid, proc.priority,
 	   proc.value, proc.t_start, proc.t_used);
     n = n->next;
   }
@@ -163,8 +163,43 @@ void show(QUE *n, struct Proc pcbTable[]){
   return;
 }
 
-void contextSwitch(struct Cpu *cpu, struct Proc *proc){
+//TODO: Need a pointer of struct Proc *pcbTable.
+void sched(struct Cpu *cpu, struct Proc pcbTable,
+	   QUE *s_run, QUE *s_ready, QUE *s_block){
+  /*
+  if(s_ready == NULL){ // No need to schedule.
+    printf("No ready processes, so continue to run the current process.\n");
+
+  }else if(s_run == NULL){ // When the running process was blocked(preempted).
+    printf("There are no process running, so assign the first process in the queue to CPU.\n");
+    proc2cpu(pcbTable[dequeue(&s_ready)], cpu);
+    dequeue(&s_run);
+    enqueue(&s_run, cpu->id);
+
+  }else if(cpu->t_remain == 0) { // When quantum expired
+    printf("Quantum was expired, so assign the first process in the que to CPU.\n");
+    cpu2proc(cpu, pcbTable[cpu.id]);
+    enqueue(&s_ready, cpu.id);
+    proc2cpu(pcbTable[dequeue(&s_ready)], cpu);
+    //swtch(cpu, pcbTable[dequeue(&s_ready)]);
+  }else{
+    printf("No needs to schedule, so continue to run the current process.\n");
+  }
+  */
+  return;
+}
+
+void swtch(struct Cpu *cpu, struct Proc *proc){
   struct Cpu temp;
+  /*
+  if(cpu == NULL){ // When 
+    cpu->pc =  proc->pc;
+    cpu->pid = proc->pid;
+    cpu->value = proc->value;
+    cpu->t_slice = quantum[proc->priority];
+    cpu->t_remain = cpu->t_slice;
+    return;
+  }
   temp.pc = cpu->pc;
   temp.pid = cpu->pid;
   temp.value = cpu->value;
@@ -174,25 +209,51 @@ void contextSwitch(struct Cpu *cpu, struct Proc *proc){
   cpu->pc =  proc->pc;
   cpu->pid = proc->pid;
   cpu->value = proc->value;
-  cpu->t_slice = proc->t_start; // ???
-  cpu->t_remain = proc->t_used; // ???
+  cpu->t_slice = quantum[proc->priority];
+  cpu->t_remain = cpu->t_slice;
 
   proc->pc = temp.pc;
   proc->pid = temp.pid;
-  proc->ppid = 0; // ???
+  //proc->ppid = 0; // ???
   proc->value = temp.value;
-  proc->priority = 0; // ???
-  proc->state = READY; // ???
-  proc->t_start = temp.t_slice; // ???
-  proc->t_used = temp.t_remain; // ???
+  //proc->priority = 0; // ???
+  //proc->state = READY; // ???
+  //proc->t_start = temp.t_slice; // ???
+  //proc->t_used = temp.t_remain; // How calculate this?
+  */
 }
 
 void cpu2proc(struct Cpu *cpu, struct Proc *proc){
   proc->pc = cpu->pc;
   proc->pid = cpu->pid;
   proc->value = cpu->value;
+  proc->t_used = cpu->t_remain;
   // proc->t_start =
   //proc->t_used =
+  return;
+}
+
+void proc2cpu(struct Proc *proc, struct Cpu *cpu){
+  cpu->pc =  proc->pc;
+  cpu->pid = proc->pid;
+  cpu->value = proc->value;
+  cpu->t_slice = quantum[proc->priority];
+  if(proc->t_used > 0){ // When blocked process is assigned.
+    printf("Blocked process was assigned to CPU.\n");
+    cpu->t_remain = proc->t_used;
+  }else{ // When new process is assigned.
+    printf("New process was assigned to CPU.\n");
+    cpu->t_remain = cpu->t_slice;
+  }
+  return;
+}
+
+void set_next_priority(struct Proc *p){
+  if(p->priority == CLASS_3){
+    p->priority = CLASS_3;
+  }else{
+    p->priority += 1;
+  }
   return;
 }
 
@@ -215,7 +276,7 @@ int readProgram(char *fname, char prog[][MAX_STR]){
   }
 
   i=0;
-  if(DEBUG) printf("Read '%s' program:\n", fname);
+  //if(DEBUG) printf("Read '%s' program:\n", fname);
   while(1){
     pp = fgets(buff, MAX_STR, fp);
     
@@ -230,7 +291,7 @@ int readProgram(char *fname, char prog[][MAX_STR]){
     if(pp == NULL){
       break;
     }
-    if(DEBUG) printf("%3d: '%s'\n", i, buff);
+    //if(DEBUG) printf("%3d: '%s'\n", i, buff);
     i++;
   }
 
@@ -329,29 +390,36 @@ void processManagerProcess(int rfd)
   struct Cpu cpu;
   //struct Proc proc; // Now fixing to the data structure below.
   struct Proc pcbTable[MAX_PROCS];
-  //int pt_index, pt_count;
+
   QUE *ready_states;
   QUE *blocked_states;
   QUE *running_states;
   /**************************************/
 
   /* Initializing */
+  quantum[CLASS_0] = 1;
+  quantum[CLASS_1] = 2;
+  quantum[CLASS_2] = 4;
+  quantum[CLASS_3] = 8;
+  
   pid_count = 0;
   current_time = 0;
   cpu.pc = 0;
   cpu.pid = 0;
   cpu.value = 0;
+  cpu.t_slice = quantum[CLASS_0];
+  cpu.t_remain = cpu.t_slice;
 
-  //pt_index = 0;
-  pcbTable[cpu.pid] = create_proc(pid_count++, -1, 0, 0, 0,
-				     current_time, 0, "init_test");
-  
+  pcbTable[cpu.pid] = create_proc(pid_count++, -1, CLASS_0, cpu.pc, cpu.value,
+				  current_time, quantum[CLASS_0]-current_time,
+				  "init_test");
+
   ready_states = NULL;
   blocked_states = NULL;
-  running_states = NULL; // TODO: Re-thinking if needed
+  running_states = NULL; // TODO: Re-thinking of this structure needed.
   enqueue(&running_states, cpu.pid);
   /****************/
-  if(DEBUG) show(running_states, pcbTable);
+  //if(DEBUG) show(running_states, pcbTable);
 
   int n;
   struct Proc temp_proc;
@@ -362,13 +430,15 @@ void processManagerProcess(int rfd)
   
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
     
-    printf("Instruction=%s",buffer);
+    printf("Instruction = %s",buffer);
     if(!strcmp(buffer, "Q\n")){
       printf("End of one unit of time.\n");
+      printf("Command = '%s'\n", pcbTable[cpu.pid].prog[cpu.pc]);
       cmd = split(&n, pcbTable[cpu.pid].prog[cpu.pc]);
+      
       current_time++;
       cpu.pc++;
-      printf("cmd[0]=%s\n",cmd[0]);
+      cpu.t_remain--;
       
       if(!strcmp(cmd[0], "S")){
 	printf("Set the value of the integer variable to %d.\n", atoi(cmd[1]));
@@ -395,19 +465,18 @@ void processManagerProcess(int rfd)
 	cpu2proc(&cpu, &pcbTable[cpu.pid]);
 	printf("Running Process(pid=%d) was blocked.\n", cpu.pid);
 	enqueue(&blocked_states, cpu.pid);
-	// TODO: scheduling required.
+	// Scheduling required.
 	
       }else if(!strcmp(cmd[0], "E")){
 	printf("Terminate this simulated process.\n");
 	dequeue(&running_states);
 	printf("pid=%d is Terminated.\n", cpu.pid);
-	// TODO: scheduling required.
+	// Scheduling required.
 	
       }else if(!strcmp(cmd[0], "F")){
 	printf("Create %d new simulated process(es).\n", atoi(cmd[1]));
 	arg = atoi(cmd[1]);
-
-	cpu.pc += arg; // Execute N instructions after the next instruction. 
+	
 	cpu2proc(&cpu, &pcbTable[cpu.pid]);
 	/* Duplicate a proc and enqueue it into Ready states list. */
 	for(x=0; x<arg; x++){
@@ -415,8 +484,9 @@ void processManagerProcess(int rfd)
 	  pcbTable[pid_count++] = dup_proc(&pcbTable[cpu.pid], pid_count,
 					   arg, current_time);
 	  enqueue(&ready_states, pid_count-1);
-	  printf("Created a process with pid=%d.\n", pid_count-1);
+	  printf("Created a process(pid=%d).\n", pid_count-1);
 	}
+	cpu.pc += arg; // Execute N instructions after the next instruction. 
 	// Not necessary to schdule processes.
 	
       }else if(!strcmp(cmd[0],"R")){
@@ -432,12 +502,51 @@ void processManagerProcess(int rfd)
 	}
 	*/
 	readProgram(temp_fname, pcbTable[cpu.pid].prog);
-	printf("Replaced the current program with the program in '%s' file.\n", temp_fname);
+	//printf("Replaced the current program with the program in '%s' file.\n", temp_fname);
 	
       }else{
 	printf("Unknown Instruction.");	
       }      
+
+      /*** Do scheduling ***/
+      //sched();
+      if(ready_states == NULL){ // No processes in the Ready queue, so skipped.
+	printf("No ready processes, so continue to run the current process.\n");
+	if(running_states == NULL){ // No process running: finished execution.
+	  printf("Program was successfully executed.\n");
+	  printf("=== END OF PRORAM ===\n");
+	  return;
+	}
+	
+      }else if(running_states == NULL){ // When process was blocked or terminated.
+	printf("There are no process running, so assign the first process in the queue to CPU.\n");
+	temp_pid = dequeue(&ready_states);
+	proc2cpu(&pcbTable[temp_pid], &cpu);
+	enqueue(&running_states, temp_pid);
+	printf("Assigned: cpu <--- pcbTable[%d]\n", temp_pid);
+	
+      }else if(cpu.t_remain <= 0) { // When quantum expired
+	printf("Quantum was expired, so assign the first process in the que to CPU.\n");
+	set_next_priority(&pcbTable[cpu.pid]);
+	printf("Pid(%d)'s priority class was raised to %d.\n",
+	       cpu.pid, pcbTable[cpu.pid].priority);
+	cpu2proc(&cpu, &pcbTable[cpu.pid]);
+	enqueue(&ready_states, cpu.pid);
+	temp_pid = dequeue(&running_states);
+	
+	proc2cpu(&pcbTable[dequeue(&ready_states)], &cpu);
+	enqueue(&running_states, cpu.pid);
+	printf("Swithed: cpu(%d) <--> pid(%d)\n", temp_pid, cpu.pid);
+	
+      }else if(cpu.t_remain > 0){
+	printf("CPU Time is still remained, so continue to run the current process.\n");
+	
+      }else{
+	printf("Unknown condition to schedule.\n");
+      }
+      /*** End of Scheduling ***/
       free(cmd);
+      /* End of Unit of Time*/
       
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
@@ -454,6 +563,7 @@ void processManagerProcess(int rfd)
       if ((temp_pid = fork()) == -1) {
 	perror("fork");
       } else if (temp_pid == 0) {
+	if(DEBUG) cpu2proc(&cpu, &pcbTable[cpu.pid]);
 	reporterProcess(pcbTable, current_time,
 			running_states, ready_states, blocked_states);
       } else {
