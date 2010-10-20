@@ -2,4 +2,4 @@
 *.pyc
 *#
 ./sample
-
+*.out
