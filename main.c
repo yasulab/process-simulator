@@ -414,7 +414,7 @@ void processManagerProcess(int rfd)
 
   pcbTable[cpu.pid] = create_proc(pid_count++, -1, CLASS_0, cpu.pc, cpu.value,
 				  current_time, quantum[CLASS_0]-current_time,
-				  "init_test");
+				  "init_sample");
 
   ready_states = NULL;
   blocked_states = NULL;
