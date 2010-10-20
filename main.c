@@ -52,13 +52,13 @@ char buffer[BUFSIZ];
 //int pid_cnt;
 
 typedef struct Que {
-  int pt_index;
+  int pid;
   struct Proc proc;
   struct Que *next; /* pointer to next element in list */
 } QUE;
 
 /* Insert into a head */
-QUE *insert_head(QUE **p, int pt_index)
+QUE *insert_head(QUE **p, int pid)
 {
   QUE *n = (QUE *) malloc(sizeof(QUE));
   if (n == NULL) return NULL;
@@ -66,18 +66,18 @@ QUE *insert_head(QUE **p, int pt_index)
   n->next = *p;
   *p = n;
   //n->proc = pt;
-  n->pt_index = pt_index;
+  n->pid = pid;
 
   return n;
 }
 
 /* Enque into a tail */
-QUE *enqueue(QUE **p, int pt_index)
+QUE *enqueue(QUE **p, int pid)
 {
   QUE *tail = *p;
   //printf("pid=%d\n", s.pid);
   if(*p == NULL) // For initial setup
-    return insert_head(p, pt_index);
+    return insert_head(p, pid);
 
   while(tail->next != NULL) //tail refers to a tail node
     tail = tail->next;
@@ -89,7 +89,7 @@ QUE *enqueue(QUE **p, int pt_index)
   n->next = tail->next;
   tail->next = n;
   //n->proc = pt;  // equivalent to 'tail->next->proc = pt;'
-  n->pt_index = pt_index;
+  n->pid = pid;
 
   return n;
 }
@@ -98,17 +98,17 @@ QUE *enqueue(QUE **p, int pt_index)
 int dequeue(QUE **p){
   //struct Proc s;
   //s.pid = -1;
-  int pt_index = -1;
+  int pid = -1;
   if (*p != NULL){
     //printf("DEQ(pid=%d)\n", (*p)->proc.pid);
-      pt_index = (*p)->pt_index;
+      pid = (*p)->pid;
       QUE *n = *p;
       *p = n->next;
       free(n);
-      return pt_index;
+      return pid;
   }else{
     //printf("cannot remove, because queue is empty\n");
-    return pt_index;
+    return pid;
   }
 }
 
@@ -152,7 +152,7 @@ void show(QUE *n, struct Proc pcbTable[]){
     return ;
   }
   while (n != NULL){
-    proc = pcbTable[n->pt_index];
+    proc = pcbTable[n->pid];
     printf("pid, ppid, priority, value, start time, CPU time used so far\n");
     printf("%3d,  %3d, %8d, %5d, %10d, %3d\n",
 	   proc.pid, proc.ppid, proc.priority,
@@ -329,7 +329,7 @@ void processManagerProcess(int rfd)
   struct Cpu cpu;
   //struct Proc proc; // Now fixing to the data structure below.
   struct Proc pcbTable[MAX_PROCS];
-  int pt_index, pt_count;
+  //int pt_index, pt_count;
   QUE *ready_states;
   QUE *blocked_states;
   QUE *running_states;
@@ -339,16 +339,17 @@ void processManagerProcess(int rfd)
   pid_count = 0;
   current_time = 0;
   cpu.pc = 0;
+  cpu.pid = 0;
   cpu.value = 0;
 
-  pt_index = 0;
-  pcbTable[pt_count++] = create_proc(pid_count++, -1, 0, 0, 0,
+  //pt_index = 0;
+  pcbTable[cpu.pid] = create_proc(pid_count++, -1, 0, 0, 0,
 				     current_time, 0, "init_test");
   
   ready_states = NULL;
   blocked_states = NULL;
   running_states = NULL; // TODO: Re-thinking if needed
-  enqueue(&running_states, pt_index);
+  enqueue(&running_states, cpu.pid);
   /****************/
   if(DEBUG) show(running_states, pcbTable);
 
@@ -364,9 +365,7 @@ void processManagerProcess(int rfd)
     printf("Instruction=%s",buffer);
     if(!strcmp(buffer, "Q\n")){
       printf("End of one unit of time.\n");
-      if(DEBUG) printf("Next line: %s\n", pcbTable[cpu.pid].prog[cpu.pc]);
-      if(DEBUG) printf("pt_index = %d\n", pt_index);
-      cmd = split(&n, pcbTable[pt_index].prog[cpu.pc]);
+      cmd = split(&n, pcbTable[cpu.pid].prog[cpu.pc]);
       current_time++;
       cpu.pc++;
       printf("cmd[0]=%s\n",cmd[0]);
@@ -393,15 +392,15 @@ void processManagerProcess(int rfd)
 	printf("Block this simulated process.\n");
 	// Store CPU data to proc
 	dequeue(&running_states); 
-	cpu2proc(&cpu, &pcbTable[pt_index]);
-	printf("Running Process(pid=%d) was blocked.\n", pcbTable[pt_index].pid);
-	enqueue(&blocked_states, pt_index);
+	cpu2proc(&cpu, &pcbTable[cpu.pid]);
+	printf("Running Process(pid=%d) was blocked.\n", cpu.pid);
+	enqueue(&blocked_states, cpu.pid);
 	// TODO: scheduling required.
 	
       }else if(!strcmp(cmd[0], "E")){
 	printf("Terminate this simulated process.\n");
 	dequeue(&running_states);
-	printf("pid=%d is Terminated.\n", pcbTable[pt_index].pid);
+	printf("pid=%d is Terminated.\n", cpu.pid);
 	// TODO: scheduling required.
 	
       }else if(!strcmp(cmd[0], "F")){
@@ -409,12 +408,13 @@ void processManagerProcess(int rfd)
 	arg = atoi(cmd[1]);
 
 	cpu.pc += arg; // Execute N instructions after the next instruction. 
-	cpu2proc(&cpu, &pcbTable[pt_index]);
+	cpu2proc(&cpu, &pcbTable[cpu.pid]);
 	/* Duplicate a proc and enqueue it into Ready states list. */
 	for(x=0; x<arg; x++){
   	  // create new processes.
-	  pcbTable[pt_count++] = dup_proc(&pcbTable[pt_index], pid_count++, arg, current_time);
-	  enqueue(&ready_states, pt_count-1);
+	  pcbTable[pid_count++] = dup_proc(&pcbTable[cpu.pid], pid_count,
+					   arg, current_time);
+	  enqueue(&ready_states, pid_count-1);
 	  printf("Created a process with pid=%d.\n", pid_count-1);
 	}
 	// Not necessary to schdule processes.
@@ -424,12 +424,14 @@ void processManagerProcess(int rfd)
 	strcpy(temp_fname, cmd[1]);
 	cpu.pc = 0;
 	cpu.value = 0;
+	/* // Automatically initialized in the readProgram() function.
 	for(x=0;x<MAX_LINE;x++){
 	  for(y=0;y<MAX_STR;y++){
-	    pcbTable[pt_index].prog[x][y] = '\0'; // Not tested
+	    pcbTable[cpu.pid].prog[x][y] = '\0';
 	  }
 	}
-	readProgram(temp_fname, pcbTable[pt_index].prog); // Not tested
+	*/
+	readProgram(temp_fname, pcbTable[cpu.pid].prog);
 	printf("Replaced the current program with the program in '%s' file.\n", temp_fname);
 	
       }else{
