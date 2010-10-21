@@ -1,33 +1,339 @@
-// TODO: write about:
 
-- Project summary … what  the project includes, list of features, etc.
 
-- List of any problems encountered or parts of the assignment that are not included (differences between specifications of assignment and your completed project).  Also indicate why there are these differences.  Describe how you solved the problems you encountered.
+*************************
+*** Process Simulator ***
+*************************
+Author: Yohei Yasukawa
+Date: 10/20/2010
 
-- Description of Scheduling policy you are using and description of how it’s implemented.
 
-- Information about how to run the program … what platform, how to start the program, any parameters that I need to provide.   (include anything that I might type that would cause the program to crash … known “bugs”)
+Index
+1. What's Process Simulator?
+1.1 Command Format
+1.2 Instruction Format
+1.3 Scheduling Policy
+1.4 Synchronizing Organization
+1.5 Reference
+2. How to run Process Simulator
+3. Existing Problems
+4. How to get latest codes
+5. Sample Output
 
-- If your files are compressed, indicate what algorithm is used and how I should uncompress them.
 
-// TODO: include:
-- Printed copy of sample run (screen shot)
-- Printed copy of code for all portions of the project
+1. What's Process Simulator?
+============================
+This program simulates how proceses run on a CPU,
+in order to understand how processes share the CPU.
+It includes essentail organizations in operating systems,
+such as Process and Scheduling.
 
-====================== 
-What README contains?
-- What is this program?
-This program simulates how proceses run in an operating system on a CPU.
-It simulates essentail organizations in operating systems, such as Process and Scheduling.
 
-For further details, please download the following file.
-Simulation Exercises for Operating Systems
-http://www.it.uom.gr/teaching/moss/simulation-experiments.pdf
+1.1 Command Format
+------------------
+To use this simulator, you need to know some commands for handling a world of ProcessSimulator.
+After starting the simulator, the input shell are appeared.
+When the simulator needs inputs, you can type the following commands:
 
-- How to get latest codes?
--- http://github.com/yasulab/process-simulator
+    Q: End of one unit of time
+       - CPU consumes 1 instruction from programs, and execute it.
+    U: Unblock the first simulated process in blocked queue
+       - If there is a blocked process, move its state from Blocked to Ready.
+    P: Print the current state of the system.
+       - The state include PC, PID, PPID, Priority, Value, Time, etc.
+    T: Terminate the system after printing the current state.
+       - The printing is same as 'P' command.
 
-- 
+*1 The capital or not does not matter (q, u, p, and t are also accepted).
+*2 You can read the command description above when you type 'help'.
 
-  
+
+1.2  Instruction Format
+-----------------------
+When you type Q command, 1 instruction in a special program is executed.
+The instruction has several types which include:
+    
+    S n: Set the value of integer variable to n, where n is an integer.
+    A n: Add n to the value of the integer variable, where n is an integer.
+    D n: Substract n from the value of the integer variable, where n is an integer.
+    B:	 Block this simulated process.
+    E:	 Terminate this simulated process.
+    F n: Create a new simulated process. The new simulated process is an exact copy of
+      	 the parent simulated process. The new simulated process executes from the instruction
+	 immediately after this instruction, while the parent simulated process continues its
+	 execution n instructions after the next instruction.
+    R filename: Replace the program of the simulated process with the program in the file
+      		filename, and set program counter to the first instruction of this new program.
+
+An example of a program for a simulated is as follows:
+    
+       S 1000
+       A 19
+       A 20
+       D 53
+       A 55
+       F 1
+       R file_a
+       F 1
+       R file_b
+       F 1
+       R file_c
+       F 1
+       R file_d
+       F 1
+       R file_e
+       E       
+
+
+1.3 Scheduling Policy
+---------------------
+When the simulator has more than 1 process,
+processes share a CPU by the scheduling policy.
+
+The scheduling policy used in the simulator is FIFO Queue with priority.
+When context swiching happens, the process in the Ready State queue is dequeued.
+Then, the process is assigned to the CPU, and it can use CPU for some ticks.
+The tick the process can use is determined by the priority. The relationship
+between priority and ticks are:
+
+	Priority | Quantum(ticks)
+	   0	 |    1
+	   1	 |    2
+	   2	 |    4
+	   3	 |    8
+
+If the process are preemted by B instruction, or uses all its quantum,
+the context switching happens again, and the next process in the queue will be assigned.
+
+
+1.4 Synchronizing Organization
+------------------------------
+Process Simulation issues 2 main processes, Commander and Process Manager process.
+Commander process waits a command from users, and if received it,
+the process immediately sends it to Process Manager process.
+Similarly, Process Manager process reports the state of processes by issueing
+Reporter process. So, to communicate between processes properly,
+we need synchronizing organization.
+
+Although sleep() is famous for synchronizing, Process Simulater
+synchronizes by using pipe(), which is one of the experimental challenges in this program.
+The pipe synchronization is that one process sleeps on a piped file descriptor,
+and another process executes particular instructions, and then, closethe piped
+file descriptor. So, the sleeping process notices that the file descriptor are
+no longer used, and then it stops sleeping and executes the next instruction.
+As a result, pipe serves as a synchronizing organization.
+
+You can read the specific code of the organization in main.c program.
+The codes have a comment like "Pipe Synchronization".
+
+
+
+1.5 Reference
+-------------
+For futher information, please read the "spec.pdf" file.
+
+
+
+2. How to run Process Simulator?
+=============================
+To run the simulator, you need the following envrionment.
+   - GCC version 4.2.1 (GCC version 4.* will be also satisfied.)
+   - Linux (Debian is recommended, but any distritbutions should be okay.)
+
+If you are satisfied with the environment,
+you can run the simulator by typing following commands in your terminal.
+
+   $ make clean
+   $ make
+   $ make run
+
+In default configuration, 'init.prog' are read as an initial program to start.
+If you want to read other program instead, please type the following command in your terminal.
+
+   $ ./ProcessSimulator INIT_PROGRAM_NAME
+
+Then, the targeted program determined by the command line arguemnt is read as an initial program.
+The program name does not need to have ".prog" extention.
+
+
+
+3. Existing Problems
+-------------------------
+In Process Simulator ver 1.0, the following problems were discovered.
+Part of or all of them will be fixed in the next update.
+
+- 1. Problem occurs when the program does not end with E instruction.
+- 2. Over maximum number of process(256) stops the system.
+- 3. Over maximum number of instructions in a program(64) stops the system.
+- 4. Over maximum number of inputs(256) stops the system.
+
+
+4. How to get latest code
+-------------------------
+If you would like to use latest version of Process Simulater,
+please visit the following website.
+
+    http://github.com/yasulab/process-simulator
+
+Or, please clone the code by typing the following command.
+
+    $ git clone git://github.com/yasulab/process-simulator.git
+
+To clone the code, you need to install Git in advance.
+
+Git - Fast Version Control System
+http://git-scm.com/
+
+
+5. Sample Output
+----------------
+This section explains how Process Simulator runs with an example.
+We use init.prog and calc.prog as example programs.
+
+NOTE:
+init.prog and calc.prog are as follows:
+
+init.prog:
+ 1: F 1
+ 2: R calc.prog
+ 3: E
+
+calc.prog:
+ 1: S 1000
+ 2: A 20
+ 3: D 25
+ 4: A 35
+ 5: D 30
+ 6: E
+
+To make a long behavior short,
+the following is the process from start to end of the execution.
+
+Tick | Process ID | Instruction | Memo
+1.     pid=0:  	    F 1		  pid=1 is created (Start from 2nd tick).
+2.     pid=1:       R calc.prog
+3.     pid=0:	    E		  pid=0's turn around time is 3 ticks. (3-0=3)
+4.     pid=1:	    S 1000
+5.     pid=1:	    A 20
+6.     pid=1:	    D 25
+7.     pid=1:	    A 35
+8.     pid=1:	    D 30
+9.     pid=1:	    E		  pid=1's turn around time is 7 ticks. (9-2=7)
+
+So, Average Turn Around time is 5 ticks.
+
+The following is the output that
+you can see when you actually run.
+
+OUTPUT:
+/Users/yohei/os-project% make
+gcc -c main.c
+gcc -o ProcessSimulator main.o
+/Users/yohei/os-project% make run
+make
+gcc -o ProcessSimulator main.o
+./ProcessSimulator init.prog
+> q
+> Command = q
+End of one unit of time.
+Instruction = 'F 1'
+Create 1 new simulated process(es).
+Created a process(pid=1).
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(0)'s priority class was raised to 1.
+New process was assigned to CPU.
+Swithed: cpu(0) <--> pid(1)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'R calc.prog'
+Replace the program of the simulated process with the program in the file 'calc.prog'.
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(1)'s priority class was raised to 1.
+New process was assigned to CPU.
+Swithed: cpu(1) <--> pid(0)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=0 is Terminated.
+There are no process running, so assign the first process in the queue to CPU.
+New process was assigned to CPU.
+Assigned: cpu <--- pcbTable[1]
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'S 1000'
+Set the value of the integer variable to 1000.
+CPU value: 0 -> 1000
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 20'
+Add 20 to the value of the integer variable.
+CPU value: 1000 -> 1020
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 25'
+Substract 25 from the value of the integer variable.
+CPU value: 1020 -> 995
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 35'
+Add 35 to the value of the integer variable.
+CPU value: 995 -> 1030
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 30'
+Substract 30 from the value of the integer variable.
+CPU value: 1030 -> 1000
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=1 is Terminated.
+Program was successfully executed.
+
+=== RESULT ===
+*********************************************
+The current system state is as follows:
+*********************************************
+CURRENT TIME: 9
+AVERAGE TURN AROUND TIME: 5.000000.
+
+RUNNING PROCESS:
+queue is empty
+
+BLOCKED PROCESSES:
+Queue of blocked processes:
+queue is empty
+
+PROCESSES READY TO EXECUTE:
+Queue of processes with priority 0:
+queue is empty
+Queue of processes with priority 1:
+queue is empty
+Queue of processes with priority 2:
+queue is empty
+Queue of processes with priority 3:
+queue is empty
+=== END OF SYSTEM ===
+
 

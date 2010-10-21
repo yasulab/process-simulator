@@ -6,8 +6,7 @@
 #include <string.h>
 
 #define MAX_STR 256 
-#define MAX_LINE 30
-#define MAX_TABLE 30
+#define MAX_LINE 64
 #define MAX_PROCS 256
 
 #define BLOCK 0
@@ -96,7 +95,7 @@ QUE *insert_head(QUE **p, int pid)
 QUE *enqueue(QUE **p, int pid)
 {
   QUE *tail = *p;
-  //printf("pid=%d\n", s.pid);
+  
   if(*p == NULL) // For initial setup
     return insert_head(p, pid);
 
@@ -116,8 +115,6 @@ QUE *enqueue(QUE **p, int pid)
 
 /* Dequeue from a head */
 int dequeue(QUE **p){
-  //struct Proc s;
-  //s.pid = -1;
   int pid = -1;
   if (*p != NULL){
     //printf("DEQ(pid=%d)\n", (*p)->proc.pid);
@@ -154,7 +151,6 @@ struct Proc dup_proc(struct Proc *pp, int new_pid,
   cp.ppid = pp->pid;
   cp.priority = pp->priority;
   cp.pc = pp->pc;  // Execute the instruction immediately after F instruction.
-  //cp.pc = cp.pc - 1;
   cp.value = pp->value;
   cp.t_start = current_time;
   cp.t_used = 0;
@@ -207,7 +203,7 @@ void show_by_priority(QUE *n, struct Proc pcbTable[], int priority){
   return;
 }
 
-//TODO: Need a pointer of struct Proc *pcbTable.
+//TODO: Refactoring: Need a pointer of struct Proc *pcbTable.
 void sched(struct Cpu *cpu, struct Proc pcbTable,
 	   QUE *s_run, QUE *s_ready, QUE *s_block){
   /*
@@ -233,6 +229,7 @@ void sched(struct Cpu *cpu, struct Proc pcbTable,
   return;
 }
 
+//TODO: Refactoring. 
 void swtch(struct Cpu *cpu, struct Proc *proc){
   struct Cpu temp;
   /*
@@ -272,8 +269,6 @@ void cpu2proc(struct Cpu *cpu, struct Proc *proc){
   proc->pid = cpu->pid;
   proc->value = cpu->value;
   proc->t_used = cpu->t_remain;
-  // proc->t_start =
-  //proc->t_used =
   return;
 }
 
@@ -413,14 +408,12 @@ void reporterProcess(int wfd, struct Proc pcbTable[], int time, struct TA_TIME t
   printf("\n");
   printf("RUNNING PROCESS:\n");
   show(s_run, pcbTable);
-  //TODO: Formatting the data as following:
-  //pid, ppid, priority, value, start time, CPU time used so far
+  
   printf("\n");
   printf("BLOCKED PROCESSES:\n");
   printf("Queue of blocked processes:\n");
   show(s_block, pcbTable);
-  //TODO: Formatting the data as following:
-  //pid, ppid, priority, value, start time, CPU time used so far
+  
   printf("\n");
   printf("PROCESSES READY TO EXECUTE:\n");
 
@@ -428,13 +421,7 @@ void reporterProcess(int wfd, struct Proc pcbTable[], int time, struct TA_TIME t
     printf("Queue of processes with priority %d:\n", i);
     show_by_priority(s_ready, pcbTable, i);
   }
-  //TODO: Formatting the data as following:
-  //pid, ppid, value, start time, CPU time used so far
   
-  //show("Queue of processes with priority 1: ", s_ready);
-  // ...
-  //show("Queue of processes with priority 3: ", s_ready);
-  //printf("Terminated Reporter Process.\n");
   close(wfd); // Pipe Synchronized.
   exit(3);
 }
@@ -443,7 +430,7 @@ void processManagerProcess(int rfd, char *init_program)
 {
   FILE *fp = fdopen(rfd, "r");
   int fd[2];
-  //char prog[MAX_LINE][MAX_STR];
+  
   char **cmd;
   int c, n;
   int pid_count;
@@ -453,12 +440,9 @@ void processManagerProcess(int rfd, char *init_program)
   // For skipping instructions when only blocked processes are remained.
   int wait4unblocking = false;
   
-
   // For calculating average turn around time
   struct TA_TIME ta;
-  //int ta_times[MAX_PROCS]; 
-  //int ta_count;
-
+  
   struct Proc temp_proc;
   int temp_value;
   int temp_pid;
@@ -468,14 +452,13 @@ void processManagerProcess(int rfd, char *init_program)
   /* ProcessManager's 6 Data Structures*/
   int current_time;
   struct Cpu cpu;
-  //struct Proc proc; // Now fixing to the data structure below.
   struct Proc pcbTable[MAX_PROCS];
 
   QUE *ready_states;
   QUE *blocked_states;
   QUE *running_states;
   /**************************************/
-
+  
   /* Initializing */
   quantum[CLASS_0] = 1;
   quantum[CLASS_1] = 2;
@@ -491,11 +474,11 @@ void processManagerProcess(int rfd, char *init_program)
   cpu.value = 0;
   cpu.t_slice = quantum[CLASS_0];
   cpu.t_remain = cpu.t_slice;
-
+  
   pcbTable[cpu.pid] = create_proc(pid_count++, -1, CLASS_0, cpu.pc, cpu.value,
 				  current_time, quantum[CLASS_0]-current_time,
 				  init_program);
-
+  
   ready_states = NULL;
   blocked_states = NULL;
   running_states = NULL; // TODO: Re-thinking of this structure needed.
@@ -506,7 +489,7 @@ void processManagerProcess(int rfd, char *init_program)
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
     
     printf("Command = %s",buffer);
-    if(!strcmp(buffer, "Q\n")){
+    if(!strcmp(buffer, "Q\n") || !strcmp(buffer, "q\n")){
       if(wait4unblocking == true){
 	printf("Only blocked processes remain, so waiting for unblocking.\n");
 	printf("\n");
@@ -514,7 +497,7 @@ void processManagerProcess(int rfd, char *init_program)
 	fflush(stdout);
 	continue;
       }
-	
+      
       printf("End of one unit of time.\n");
       printf("Instruction = '%s'\n", pcbTable[cpu.pid].prog[cpu.pc]);
       if(!strcmp(pcbTable[cpu.pid].prog[cpu.pc], "")){
@@ -569,13 +552,11 @@ void processManagerProcess(int rfd, char *init_program)
 	
 	cpu2proc(&cpu, &pcbTable[cpu.pid]);
 	/* Duplicate a proc and enqueue it into Ready states queue. */
-	for(x=0; x<arg; x++){
-  	  // create new processes.
-	  pcbTable[pid_count++] = dup_proc(&pcbTable[cpu.pid], pid_count,
-					   arg, current_time);
-	  enqueue(&ready_states, pid_count-1);
-	  printf("Created a process(pid=%d).\n", pid_count-1);
-	}
+	pcbTable[pid_count++] = dup_proc(&pcbTable[cpu.pid], pid_count,
+					 arg, current_time);
+	enqueue(&ready_states, pid_count-1);
+	printf("Created a process(pid=%d).\n", pid_count-1);
+	
 	cpu.pc += arg; // Execute N instructions after the next instruction. 
 	// Not necessary to schdule processes.
 	
@@ -584,13 +565,7 @@ void processManagerProcess(int rfd, char *init_program)
 	strcpy(temp_fname, cmd[1]);
 	cpu.pc = 0;
 	cpu.value = 0;
-	/* // Automatically initialized in the readProgram() function.
-	for(x=0;x<MAX_LINE;x++){
-	  for(y=0;y<MAX_STR;y++){
-	    pcbTable[cpu.pid].prog[x][y] = '\0';
-	  }
-	}
-	*/
+	
 	readProgram(temp_fname, pcbTable[cpu.pid].prog);
 	//printf("Replaced the current program with the program in '%s' file.\n", temp_fname);
 	
@@ -601,8 +576,6 @@ void processManagerProcess(int rfd, char *init_program)
       }      
 
       /*** Do scheduling ***/
-      //sched();
-      
       if(ready_states == NULL){ // No processes in the Ready queue, so skipped.
 	if(running_states != NULL){
 	  printf("No ready processes, so continue to run the current process.\n");
@@ -630,8 +603,8 @@ void processManagerProcess(int rfd, char *init_program)
 	  printf("=== END OF SYSTEM ===\n");
 	  return;
 	}
-	  
-	  
+	
+	
       }else if(running_states == NULL){ // When process was blocked or terminated.
 	printf("There are no process running, so assign the first process in the queue to CPU.\n");
 	temp_pid = dequeue(&ready_states);
@@ -662,7 +635,7 @@ void processManagerProcess(int rfd, char *init_program)
       free(cmd);
       /* End of One Unit of Time*/
       
-    }else if(!strcmp(buffer, "U\n")){
+    }else if(!strcmp(buffer, "U\n") || !strcmp(buffer, "u\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
       temp_index = dequeue(&blocked_states);
       if(temp_index == -1){
@@ -673,7 +646,7 @@ void processManagerProcess(int rfd, char *init_program)
 	wait4unblocking = false;
       }
       
-    }else if(!strcmp(buffer, "P\n")){
+    }else if(!strcmp(buffer, "P\n") || !strcmp(buffer, "p\n")){
       printf("Print the current state of the system.\n");
       if (pipe(fd)) {
 	perror("pipe");
@@ -688,9 +661,20 @@ void processManagerProcess(int rfd, char *init_program)
 	close(fd[1]);
 	while(i=(read(fd[0],&c,1)) > 0); // Pipe Synchronization
       }
-      
-      
-    }else if(!strcmp(buffer, "T\n")){
+
+    }else if(!strcmp(buffer, "help\n")){
+      printf("\
+     The following commands are accepted:\n\
+     Q:End of one unitof time\n\
+     - CPU consumes 1 instruction from programs, andexecuteit.\n\
+     U: Unblockthe first simulated process in blocked queue\n\
+     - If there is ablockedprocess, move its statefrom Blocked toReady.\n\
+     P: Print the current state of the system.\n \
+        - The state include PC, PID, PPID, Priority, Value, Time, etc.\n\
+     T: Terminate the system after printing the current state.\n\
+        - The printing is same as 'P' command.\n");
+            
+    }else if(!strcmp(buffer, "T\n") || !strcmp(buffer, "t\n")){
       printf("Print the average turnaround time, and terminate the system.\n");
       // Calculating average turnaround time.
       printf("Average turn around time is %f.\n", calc_ta_time_avg(ta));
