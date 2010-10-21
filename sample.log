@@ -1,0 +1,550 @@
+/Users/yohei/os-project% ./ProcessSimulator sample.prog 
+> q
+> Command = q
+End of one unit of time.
+Instruction = 'S 1000'
+Set the value of the integer variable to 1000.
+CPU value: 0 -> 1000
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 19'
+Add 19 to the value of the integer variable.
+CPU value: 1000 -> 1019
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 20'
+Add 20 to the value of the integer variable.
+CPU value: 1019 -> 1039
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 53'
+Substract 53 from the value of the integer variable.
+CPU value: 1039 -> 986
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 55'
+Add 55 to the value of the integer variable.
+CPU value: 986 -> 1041
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'F 1'
+Create 1 new simulated process(es).
+Created a process(pid=1).
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(0)'s priority class was raised to 1.
+New process was assigned to CPU.
+Swithed: cpu(0) <--> pid(1)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'R calc.prog'
+Replace the program of the simulated process with the program in the file 'calc.prog'.
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(1)'s priority class was raised to 1.
+New process was assigned to CPU.
+Swithed: cpu(1) <--> pid(0)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'F 1'
+Create 1 new simulated process(es).
+Created a process(pid=2).
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'F 1'
+Create 1 new simulated process(es).
+Created a process(pid=3).
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(0)'s priority class was raised to 2.
+New process was assigned to CPU.
+Swithed: cpu(0) <--> pid(1)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'S 1000'
+Set the value of the integer variable to 1000.
+CPU value: 0 -> 1000
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 20'
+Add 20 to the value of the integer variable.
+CPU value: 1000 -> 1020
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(1)'s priority class was raised to 2.
+New process was assigned to CPU.
+Swithed: cpu(1) <--> pid(2)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'R calc.prog'
+Replace the program of the simulated process with the program in the file 'calc.prog'.
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'S 1000'
+Set the value of the integer variable to 1000.
+CPU value: 0 -> 1000
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(2)'s priority class was raised to 2.
+New process was assigned to CPU.
+Swithed: cpu(2) <--> pid(3)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'R calc.prog'
+Replace the program of the simulated process with the program in the file 'calc.prog'.
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'S 1000'
+Set the value of the integer variable to 1000.
+CPU value: 0 -> 1000
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(3)'s priority class was raised to 2.
+New process was assigned to CPU.
+Swithed: cpu(3) <--> pid(0)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'F 1'
+Create 1 new simulated process(es).
+Created a process(pid=4).
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'F 1'
+Create 1 new simulated process(es).
+Created a process(pid=5).
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=0 is Terminated.
+There are no process running, so assign the first process in the queue to CPU.
+New process was assigned to CPU.
+Assigned: cpu <--- pcbTable[1]
+
+> P
+Command = P
+Print the current state of the system.
+*********************************************
+The current system state is as follows:
+*********************************************
+CURRENT TIME: 18
+AVERAGE TURN AROUND TIME: 18.000000.
+
+RUNNING PROCESS:
+pc, pid, ppid, priority, value, start time, CPU time used so far
+ 2,   1,    0,        2,  1020,          6,   4
+
+
+BLOCKED PROCESSES:
+Queue of blocked processes:
+queue is empty
+
+PROCESSES READY TO EXECUTE:
+Queue of processes with priority 0:
+queue is empty
+Queue of processes with priority 1:
+queue is empty
+Queue of processes with priority 2:
+pc, pid, ppid, priority, value, start time, CPU time used so far
+ 1,   2,    0,        2,  1000,          8,   0
+pc, pid, ppid, priority, value, start time, CPU time used so far
+ 1,   3,    0,        2,  1000,          9,   0
+pc, pid, ppid, priority, value, start time, CPU time used so far
+12,   4,    0,        2,  1041,         16,   0
+pc, pid, ppid, priority, value, start time, CPU time used so far
+14,   5,    0,        2,  1041,         17,   0
+
+Queue of processes with priority 3:
+queue is empty
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 25'
+Substract 25 from the value of the integer variable.
+CPU value: 1020 -> 995
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 35'
+Add 35 to the value of the integer variable.
+CPU value: 995 -> 1030
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 30'
+Substract 30 from the value of the integer variable.
+CPU value: 1030 -> 1000
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=1 is Terminated.
+There are no process running, so assign the first process in the queue to CPU.
+New process was assigned to CPU.
+Assigned: cpu <--- pcbTable[2]
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 20'
+Add 20 to the value of the integer variable.
+CPU value: 1000 -> 1020
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 25'
+Substract 25 from the value of the integer variable.
+CPU value: 1020 -> 995
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 35'
+Add 35 to the value of the integer variable.
+CPU value: 995 -> 1030
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 30'
+Substract 30 from the value of the integer variable.
+CPU value: 1030 -> 1000
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(2)'s priority class was raised to 3.
+New process was assigned to CPU.
+Swithed: cpu(2) <--> pid(3)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 20'
+Add 20 to the value of the integer variable.
+CPU value: 1000 -> 1020
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 25'
+Substract 25 from the value of the integer variable.
+CPU value: 1020 -> 995
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 35'
+Add 35 to the value of the integer variable.
+CPU value: 995 -> 1030
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 30'
+Substract 30 from the value of the integer variable.
+CPU value: 1030 -> 1000
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(3)'s priority class was raised to 3.
+New process was assigned to CPU.
+Swithed: cpu(3) <--> pid(4)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'R calc.prog'
+Replace the program of the simulated process with the program in the file 'calc.prog'.
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'S 1000'
+Set the value of the integer variable to 1000.
+CPU value: 0 -> 1000
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 20'
+Add 20 to the value of the integer variable.
+CPU value: 1000 -> 1020
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 25'
+Substract 25 from the value of the integer variable.
+CPU value: 1020 -> 995
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(4)'s priority class was raised to 3.
+New process was assigned to CPU.
+Swithed: cpu(4) <--> pid(5)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'R calc.prog'
+Replace the program of the simulated process with the program in the file 'calc.prog'.
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'S 1000'
+Set the value of the integer variable to 1000.
+CPU value: 0 -> 1000
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 20'
+Add 20 to the value of the integer variable.
+CPU value: 1000 -> 1020
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 25'
+Substract 25 from the value of the integer variable.
+CPU value: 1020 -> 995
+Quantum was expired, so assign the first process in the que to CPU.
+Pid(5)'s priority class was raised to 3.
+New process was assigned to CPU.
+Swithed: cpu(5) <--> pid(2)
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=2 is Terminated.
+There are no process running, so assign the first process in the queue to CPU.
+New process was assigned to CPU.
+Assigned: cpu <--- pcbTable[3]
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=3 is Terminated.
+There are no process running, so assign the first process in the queue to CPU.
+New process was assigned to CPU.
+Assigned: cpu <--- pcbTable[4]
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 35'
+Add 35 to the value of the integer variable.
+CPU value: 995 -> 1030
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 30'
+Substract 30 from the value of the integer variable.
+CPU value: 1030 -> 1000
+CPU Time is still remained, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=4 is Terminated.
+There are no process running, so assign the first process in the queue to CPU.
+New process was assigned to CPU.
+Assigned: cpu <--- pcbTable[5]
+
+> P
+Command = P
+Print the current state of the system.
+*********************************************
+The current system state is as follows:
+*********************************************
+CURRENT TIME: 43
+AVERAGE TURN AROUND TIME: 24.000000.
+
+RUNNING PROCESS:
+pc, pid, ppid, priority, value, start time, CPU time used so far
+ 3,   5,    0,        3,   995,         17,   8
+
+
+BLOCKED PROCESSES:
+Queue of blocked processes:
+queue is empty
+
+PROCESSES READY TO EXECUTE:
+Queue of processes with priority 0:
+queue is empty
+Queue of processes with priority 1:
+queue is empty
+Queue of processes with priority 2:
+queue is empty
+Queue of processes with priority 3:
+queue is empty
+
+> p
+Command = p
+Print the current state of the system.
+*********************************************
+The current system state is as follows:
+*********************************************
+CURRENT TIME: 43
+AVERAGE TURN AROUND TIME: 24.000000.
+
+RUNNING PROCESS:
+pc, pid, ppid, priority, value, start time, CPU time used so far
+ 3,   5,    0,        3,   995,         17,   8
+
+
+BLOCKED PROCESSES:
+Queue of blocked processes:
+queue is empty
+
+PROCESSES READY TO EXECUTE:
+Queue of processes with priority 0:
+queue is empty
+Queue of processes with priority 1:
+queue is empty
+Queue of processes with priority 2:
+queue is empty
+Queue of processes with priority 3:
+queue is empty
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'A 35'
+Add 35 to the value of the integer variable.
+CPU value: 995 -> 1030
+No ready processes, so continue to run the current process.
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'D 30'
+Substract 30 from the value of the integer variable.
+CPU value: 1030 -> 1000
+No ready processes, so continue to run the current process.
+
+> p
+Command = p
+Print the current state of the system.
+*********************************************
+The current system state is as follows:
+*********************************************
+CURRENT TIME: 45
+AVERAGE TURN AROUND TIME: 24.000000.
+
+RUNNING PROCESS:
+pc, pid, ppid, priority, value, start time, CPU time used so far
+ 5,   5,    0,        3,  1000,         17,   6
+
+
+BLOCKED PROCESSES:
+Queue of blocked processes:
+queue is empty
+
+PROCESSES READY TO EXECUTE:
+Queue of processes with priority 0:
+queue is empty
+Queue of processes with priority 1:
+queue is empty
+Queue of processes with priority 2:
+queue is empty
+Queue of processes with priority 3:
+queue is empty
+
+> q
+Command = q
+End of one unit of time.
+Instruction = 'E'
+Terminate this simulated process.
+pid=5 is Terminated.
+Program was successfully executed.
+
+=== RESULT ===
+*********************************************
+The current system state is as follows:
+*********************************************
+CURRENT TIME: 46
+AVERAGE TURN AROUND TIME: 25.000000.
+
+RUNNING PROCESS:
+queue is empty
+
+BLOCKED PROCESSES:
+Queue of blocked processes:
+queue is empty
+
+PROCESSES READY TO EXECUTE:
+Queue of processes with priority 0:
+queue is empty
+Queue of processes with priority 1:
+queue is empty
+Queue of processes with priority 2:
+queue is empty
+Queue of processes with priority 3:
+queue is empty
+=== END OF SYSTEM ===
+
+
