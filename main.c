@@ -129,6 +129,7 @@ int dequeue(QUE **p){
   }
 }
 
+/* Create a new process with given parameters. */
 struct Proc create_proc(int pid, int ppid, int priority, int pc, int value,
 			int t_start, int t_used, char *fname){
   static struct Proc proc;
@@ -144,6 +145,7 @@ struct Proc create_proc(int pid, int ppid, int priority, int pc, int value,
   return proc;
 }
 
+/* Duplicate a process and change some parameters with given parameters. */
 struct Proc dup_proc(struct Proc *pp, int new_pid,
 		     int dup_times, int current_time){
   static struct Proc cp;
@@ -159,7 +161,7 @@ struct Proc dup_proc(struct Proc *pp, int new_pid,
   return cp;
 } 
 
-/* Show a queue */
+/* Show the status of a give queue. */
 void show(QUE *n, struct Proc pcbTable[]){
   struct Proc proc;
   
@@ -179,6 +181,7 @@ void show(QUE *n, struct Proc pcbTable[]){
   return;
 }
 
+/* Show the status of a give queue by priority. */
 void show_by_priority(QUE *n, struct Proc pcbTable[], int priority){
   struct Proc proc;
   int count = 0;
@@ -203,67 +206,7 @@ void show_by_priority(QUE *n, struct Proc pcbTable[], int priority){
   return;
 }
 
-//TODO: Refactoring: Need a pointer of struct Proc *pcbTable.
-void sched(struct Cpu *cpu, struct Proc pcbTable,
-	   QUE *s_run, QUE *s_ready, QUE *s_block){
-  /*
-  if(s_ready == NULL){ // No need to schedule.
-    printf("No ready processes, so continue to run the current process.\n");
-
-  }else if(s_run == NULL){ // When the running process was blocked(preempted).
-    printf("There are no process running, so assign the first process in the queue to CPU.\n");
-    proc2cpu(pcbTable[dequeue(&s_ready)], cpu);
-    dequeue(&s_run);
-    enqueue(&s_run, cpu->id);
-
-  }else if(cpu->t_remain == 0) { // When quantum expired
-    printf("Quantum was expired, so assign the first process in the que to CPU.\n");
-    cpu2proc(cpu, pcbTable[cpu.id]);
-    enqueue(&s_ready, cpu.id);
-    proc2cpu(pcbTable[dequeue(&s_ready)], cpu);
-    //swtch(cpu, pcbTable[dequeue(&s_ready)]);
-  }else{
-    printf("No needs to schedule, so continue to run the current process.\n");
-  }
-  */
-  return;
-}
-
-//TODO: Refactoring. 
-void swtch(struct Cpu *cpu, struct Proc *proc){
-  struct Cpu temp;
-  /*
-  if(cpu == NULL){ // When 
-    cpu->pc =  proc->pc;
-    cpu->pid = proc->pid;
-    cpu->value = proc->value;
-    cpu->t_slice = quantum[proc->priority];
-    cpu->t_remain = cpu->t_slice;
-    return;
-  }
-  temp.pc = cpu->pc;
-  temp.pid = cpu->pid;
-  temp.value = cpu->value;
-  temp.t_slice = cpu->t_slice;
-  temp.t_remain = cpu->t_remain;
-
-  cpu->pc =  proc->pc;
-  cpu->pid = proc->pid;
-  cpu->value = proc->value;
-  cpu->t_slice = quantum[proc->priority];
-  cpu->t_remain = cpu->t_slice;
-
-  proc->pc = temp.pc;
-  proc->pid = temp.pid;
-  //proc->ppid = 0; // ???
-  proc->value = temp.value;
-  //proc->priority = 0; // ???
-  //proc->state = READY; // ???
-  //proc->t_start = temp.t_slice; // ???
-  //proc->t_used = temp.t_remain; // How calculate this?
-  */
-}
-
+/* Store a given cpu to a given process. */
 void cpu2proc(struct Cpu *cpu, struct Proc *proc){
   proc->pc = cpu->pc;
   proc->pid = cpu->pid;
@@ -272,6 +215,7 @@ void cpu2proc(struct Cpu *cpu, struct Proc *proc){
   return;
 }
 
+/* Store a given process to a given cpu. */
 void proc2cpu(struct Proc *proc, struct Cpu *cpu){
   cpu->pc =  proc->pc;
   cpu->pid = proc->pid;
@@ -287,6 +231,7 @@ void proc2cpu(struct Proc *proc, struct Cpu *cpu){
   return;
 }
 
+/* Set next priority based on a give priority. */
 void set_next_priority(struct Proc *p){
   if(p->priority == CLASS_3){
     p->priority = CLASS_3;
@@ -296,10 +241,12 @@ void set_next_priority(struct Proc *p){
   return;
 }
 
+/* Calculate a turn around time by a given current time and process. */
 int calc_ta_time(int current_time, struct Proc *p){
   return current_time - p->t_start;
 }
 
+/* Calculate an average turn around time between all processes. */
 double calc_ta_time_avg(struct TA_TIME ta){
   int i;
   int total = 0;
@@ -313,6 +260,7 @@ double calc_ta_time_avg(struct TA_TIME ta){
   }
 }
 
+/* Read a program by a given filename and store it to program arrays. */
 int readProgram(char *fname, char prog[][MAX_STR]){
   FILE *fp;
   char buff[MAX_STR], *pp;
@@ -355,6 +303,7 @@ int readProgram(char *fname, char prog[][MAX_STR]){
   return(0);
 }
 
+/* Split a string by spaces and return array.*/
 char **split(int *n, char *string)
 {
   char **array=NULL;
@@ -370,6 +319,8 @@ char **split(int *n, char *string)
   return array;
 }
 
+/* Whenever comes into a given input file descriptor,
+   gives it into a output file descriptor. */
 void copy(FILE *fin, FILE *fout)
 {
   while (fgets(buffer, BUFSIZ, fin) != NULL) {
@@ -378,6 +329,8 @@ void copy(FILE *fin, FILE *fout)
   }
 }
 
+/* Commander process that manipulates inputs from users,
+   and send them to Process Manager process. */
 void commanderProcess(int wfd)
 {
   FILE *fp = fdopen(wfd, "w");
@@ -397,6 +350,7 @@ void commanderProcess(int wfd)
   }
 }
 
+/* Report the current status of system. */
 void reporterProcess(int wfd, struct Proc pcbTable[], int time, struct TA_TIME ta,
 		     QUE *s_run, QUE *s_ready, QUE *s_block){
   int i;
@@ -426,6 +380,8 @@ void reporterProcess(int wfd, struct Proc pcbTable[], int time, struct TA_TIME t
   exit(3);
 }
 
+/* Based on inputs from Commander process,
+   manage all processes and share a CPU between them. */
 void processManagerProcess(int rfd, char *init_program)
 {
   FILE *fp = fdopen(rfd, "r");
