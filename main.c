@@ -19,11 +19,28 @@
 #define false 0
 
 /* Priority Hierarchy */
+#define MAX_PRIORITY 4
 #define CLASS_0 0
 #define CLASS_1 1
 #define CLASS_2 2
 #define CLASS_3 3
 
+/* Quick Call to ReporterProcess */
+#define REPORT \
+if (pipe(fd)) {	    \
+    perror("pipe"); \
+  } else if ((temp_pid = fork()) == -1) { \
+    perror("fork"); \
+  } else if (temp_pid == 0) { \
+    close(fd[0]); \
+    if(DEBUG) cpu2proc(&cpu, &pcbTable[cpu.pid]); \
+    reporterProcess(fd[1], pcbTable, current_time, ta, \
+		    running_states, ready_states, blocked_states); \
+  } else { \
+    close(fd[1]); \
+    while(i=(read(fd[0],&c,1)) > 0); // Pipe Synchronization \
+  } \
+  
 struct Cpu
 {
   int pc;
@@ -47,16 +64,19 @@ struct Proc
   char prog[MAX_LINE][MAX_STR]; // Programs for simulated processes.
 };
 
-char buffer[BUFSIZ];
-int quantum[4];
-//int time;
-//int pid_cnt;
-
 typedef struct Que {
   int pid;
   struct Proc proc;
   struct Que *next; /* pointer to next element in list */
 } QUE;
+
+struct TA_TIME{
+  int times[MAX_PROCS];
+  int count;
+};
+  
+char buffer[BUFSIZ];
+int quantum[4];
 
 /* Insert into a head */
 QUE *insert_head(QUE **p, int pid)
@@ -163,6 +183,30 @@ void show(QUE *n, struct Proc pcbTable[]){
   return;
 }
 
+void show_by_priority(QUE *n, struct Proc pcbTable[], int priority){
+  struct Proc proc;
+  int count = 0;
+  
+  while (n != NULL){
+    if(pcbTable[n->pid].priority == priority){
+      proc = pcbTable[n->pid];
+      printf("pc, pid, ppid, priority, value, start time, CPU time used so far\n");
+      printf("%2d, %3d,  %3d, %8d, %5d, %10d, %3d\n",
+	     proc.pc, proc.pid, proc.ppid, proc.priority,
+	     proc.value, proc.t_start, proc.t_used);
+      count++;
+    }
+    n = n->next;
+  }
+  
+  if (count == 0){
+    printf("queue is empty\n");
+    return ;
+  }
+  printf("\n");
+  return;
+}
+
 //TODO: Need a pointer of struct Proc *pcbTable.
 void sched(struct Cpu *cpu, struct Proc pcbTable,
 	   QUE *s_run, QUE *s_ready, QUE *s_block){
@@ -257,6 +301,23 @@ void set_next_priority(struct Proc *p){
   return;
 }
 
+int calc_ta_time(int current_time, struct Proc *p){
+  return current_time - p->t_start;
+}
+
+double calc_ta_time_avg(struct TA_TIME ta){
+  int i;
+  int total = 0;
+  for(i=0; i<ta.count; i++){
+    total += ta.times[i];
+  }
+  if(ta.count == 0){
+    return 0;
+  }else{
+    return total/ta.count;
+  }
+}
+
 int readProgram(char *fname, char prog[][MAX_STR]){
   FILE *fp;
   char buff[MAX_STR], *pp;
@@ -265,7 +326,7 @@ int readProgram(char *fname, char prog[][MAX_STR]){
   /* Initialize program arrays */
   for(x=0;x<MAX_LINE;x++){
     for(y=0;y<MAX_STR;y++){
-      prog[x][y] = '\0'; // Not tested
+      prog[x][y] = '\0';
     }
   }
 
@@ -316,7 +377,6 @@ char **split(int *n, char *string)
 
 void copy(FILE *fin, FILE *fout)
 {
-  printf("> ");
   while (fgets(buffer, BUFSIZ, fin) != NULL) {
     fputs(buffer, fout);
     fflush(fout);
@@ -342,12 +402,14 @@ void commanderProcess(int wfd)
   }
 }
 
-void reporterProcess(int wfd, struct Proc pcbTable[], int time,
+void reporterProcess(int wfd, struct Proc pcbTable[], int time, struct TA_TIME ta,
 		     QUE *s_run, QUE *s_ready, QUE *s_block){
+  int i;
   printf("*********************************************\n");
   printf("The current system state is as follows:\n");
   printf("*********************************************\n");
   printf("CURRENT TIME: %d\n", time);
+  printf("AVERAGE TURN AROUND TIME: %f.\n", calc_ta_time_avg(ta));
   printf("\n");
   printf("RUNNING PROCESS:\n");
   show(s_run, pcbTable);
@@ -361,8 +423,11 @@ void reporterProcess(int wfd, struct Proc pcbTable[], int time,
   //pid, ppid, priority, value, start time, CPU time used so far
   printf("\n");
   printf("PROCESSES READY TO EXECUTE:\n");
-  printf("Queue of processes with priority 0:\n");
-  show(s_ready, pcbTable);
+
+  for(i=0; i<MAX_PRIORITY; i++){
+    printf("Queue of processes with priority %d:\n", i);
+    show_by_priority(s_ready, pcbTable, i);
+  }
   //TODO: Formatting the data as following:
   //pid, ppid, value, start time, CPU time used so far
   
@@ -374,18 +439,31 @@ void reporterProcess(int wfd, struct Proc pcbTable[], int time,
   exit(3);
 }
 
-void processManagerProcess(int rfd)
+void processManagerProcess(int rfd, char *init_program)
 {
   FILE *fp = fdopen(rfd, "r");
   int fd[2];
   //char prog[MAX_LINE][MAX_STR];
   char **cmd;
-  int i, c;
+  int c, n;
   int pid_count;
   int arg;
-  int x,y; // iterators
+  int i,x,y; // iterators
+  int err_flg = false;
+  // For skipping instructions when only blocked processes are remained.
   int wait4unblocking = false;
   
+
+  // For calculating average turn around time
+  struct TA_TIME ta;
+  //int ta_times[MAX_PROCS]; 
+  //int ta_count;
+
+  struct Proc temp_proc;
+  int temp_value;
+  int temp_pid;
+  char temp_fname[MAX_STR];
+  int temp_index;
   
   /* ProcessManager's 6 Data Structures*/
   int current_time;
@@ -405,6 +483,8 @@ void processManagerProcess(int rfd)
   quantum[CLASS_3] = 8;
   
   pid_count = 0;
+  ta.count = 0;
+  ta.times[0] = 0;
   current_time = 0;
   cpu.pc = 0;
   cpu.pid = 0;
@@ -414,7 +494,7 @@ void processManagerProcess(int rfd)
 
   pcbTable[cpu.pid] = create_proc(pid_count++, -1, CLASS_0, cpu.pc, cpu.value,
 				  current_time, quantum[CLASS_0]-current_time,
-				  "init_sample");
+				  init_program);
 
   ready_states = NULL;
   blocked_states = NULL;
@@ -422,17 +502,10 @@ void processManagerProcess(int rfd)
   enqueue(&running_states, cpu.pid);
   /****************/
   //if(DEBUG) show(running_states, pcbTable);
-
-  int n;
-  struct Proc temp_proc;
-  int temp_value;
-  int temp_pid;
-  char temp_fname[MAX_STR];
-  int temp_index;
   
   while (fgets(buffer, BUFSIZ, fp) != NULL) {
     
-    printf("Instruction = %s",buffer);
+    printf("Command = %s",buffer);
     if(!strcmp(buffer, "Q\n")){
       if(wait4unblocking == true){
 	printf("Only blocked processes remain, so waiting for unblocking.\n");
@@ -443,8 +516,14 @@ void processManagerProcess(int rfd)
       }
 	
       printf("End of one unit of time.\n");
-      printf("Command = '%s'\n", pcbTable[cpu.pid].prog[cpu.pc]);
-      cmd = split(&n, pcbTable[cpu.pid].prog[cpu.pc]);
+      printf("Instruction = '%s'\n", pcbTable[cpu.pid].prog[cpu.pc]);
+      if(!strcmp(pcbTable[cpu.pid].prog[cpu.pc], "")){
+	printf("Instructions unexpectedy finished, so exit forcedlly with printing.\n");
+	sprintf(cmd[0], "E");
+	err_flg = true;
+      }else{
+	cmd = split(&n, pcbTable[cpu.pid].prog[cpu.pc]);
+      }
       
       current_time++;
       cpu.pc++;
@@ -454,19 +533,19 @@ void processManagerProcess(int rfd)
 	printf("Set the value of the integer variable to %d.\n", atoi(cmd[1]));
 	temp_value = cpu.value;
 	cpu.value = atoi(cmd[1]);
-	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	printf("CPU value: %d -> %d\n", temp_value, cpu.value);
 	
       }else if(!strcmp(cmd[0], "A")){
 	printf("Add %d to the value of the integer variable.\n", atoi(cmd[1]));
 	temp_value = cpu.value;
 	cpu.value += atoi(cmd[1]);
-	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	printf("CPU value: %d -> %d\n", temp_value, cpu.value);
 	
       }else if(!strcmp(cmd[0], "D")){
 	printf("Substract %d from the value of the integer variable.\n", atoi(cmd[1]));
 	temp_value = cpu.value;
 	cpu.value -= atoi(cmd[1]);
-	printf("cpu.value: %d -> %d\n", temp_value, cpu.value);
+	printf("CPU value: %d -> %d\n", temp_value, cpu.value);
 	
       }else if(!strcmp(cmd[0], "B")){
 	printf("Block this simulated process.\n");
@@ -481,6 +560,7 @@ void processManagerProcess(int rfd)
 	printf("Terminate this simulated process.\n");
 	dequeue(&running_states);
 	printf("pid=%d is Terminated.\n", cpu.pid);
+	ta.times[ta.count++] = calc_ta_time(current_time, &pcbTable[cpu.pid]);
 	// Scheduling required.
 	
       }else if(!strcmp(cmd[0], "F")){
@@ -488,7 +568,7 @@ void processManagerProcess(int rfd)
 	arg = atoi(cmd[1]);
 	
 	cpu2proc(&cpu, &pcbTable[cpu.pid]);
-	/* Duplicate a proc and enqueue it into Ready states list. */
+	/* Duplicate a proc and enqueue it into Ready states queue. */
 	for(x=0; x<arg; x++){
   	  // create new processes.
 	  pcbTable[pid_count++] = dup_proc(&pcbTable[cpu.pid], pid_count,
@@ -515,7 +595,9 @@ void processManagerProcess(int rfd)
 	//printf("Replaced the current program with the program in '%s' file.\n", temp_fname);
 	
       }else{
-	printf("Unknown Instruction.");	
+	printf("Unknown Instruction.\n");
+	printf("Exited by error.\n");
+	return;
       }      
 
       /*** Do scheduling ***/
@@ -529,8 +611,23 @@ void processManagerProcess(int rfd)
 	  wait4unblocking = true;
 	}else{
 	  // All processes were finished -> finished execution.
-	  printf("Program was successfully executed.\n");
-	  printf("=== END OF PRORAM ===\n");
+	  if(err_flg == false) printf("Program was successfully executed.\n");
+	  printf("\n");
+	  printf("=== RESULT ===\n");
+	  if (pipe(fd)) {
+	    perror("pipe");
+	  } else if ((temp_pid = fork()) == -1) {
+	    perror("fork");
+	  } else if (temp_pid == 0) {
+	    close(fd[0]);
+	    if(DEBUG) cpu2proc(&cpu, &pcbTable[cpu.pid]);
+	    reporterProcess(fd[1], pcbTable, current_time, ta,
+			    running_states, ready_states, blocked_states);
+	  } else {
+	    close(fd[1]);
+	    while(i=(read(fd[0],&c,1)) > 0); // Pipe Synchronization
+	  }
+	  printf("=== END OF SYSTEM ===\n");
 	  return;
 	}
 	  
@@ -563,7 +660,7 @@ void processManagerProcess(int rfd)
       }
       /*** End of Scheduling ***/
       free(cmd);
-      /* End of Unit of Time*/
+      /* End of One Unit of Time*/
       
     }else if(!strcmp(buffer, "U\n")){
       printf("Unblock the first simulated process in blocked queue.\n");
@@ -585,16 +682,18 @@ void processManagerProcess(int rfd)
       } else if (temp_pid == 0) {
 	close(fd[0]);
 	if(DEBUG) cpu2proc(&cpu, &pcbTable[cpu.pid]);
-	reporterProcess(fd[1], pcbTable, current_time,
+	reporterProcess(fd[1], pcbTable, current_time, ta,
 			running_states, ready_states, blocked_states);
       } else {
 	close(fd[1]);
 	while(i=(read(fd[0],&c,1)) > 0); // Pipe Synchronization
       }
       
+      
     }else if(!strcmp(buffer, "T\n")){
       printf("Print the average turnaround time, and terminate the system.\n");
-      // TODO: Implemente calculatting the function to average turnaround time.
+      // Calculating average turnaround time.
+      printf("Average turn around time is %f.\n", calc_ta_time_avg(ta));
       if (pipe(fd)) {
 	perror("pipe");
       } else if ((temp_pid = fork()) == -1) {
@@ -602,7 +701,7 @@ void processManagerProcess(int rfd)
       } else if (temp_pid == 0) {
 	close(fd[0]);
 	if(DEBUG) cpu2proc(&cpu, &pcbTable[cpu.pid]);
-	reporterProcess(fd[1], pcbTable, current_time,
+	reporterProcess(fd[1], pcbTable, current_time, ta,
 			running_states, ready_states, blocked_states);
       } else {
 	close(fd[1]);
@@ -623,9 +722,16 @@ void processManagerProcess(int rfd)
   fclose(fp);
 }
 
-int main(void)
-{
+int main(int argc, char *argv[]){
   int rv = 0, fd[2], pid;
+  char fname[MAX_STR];
+
+  if(argc != 2){
+    printf("USAGE: ./a.out INIT_PROGRAM_NAME\n\n");
+    return;
+  }
+  printf("> ");
+  strcpy(fname, argv[1]);
 
   if (pipe(fd)) {
     perror("pipe");
@@ -638,7 +744,7 @@ int main(void)
     commanderProcess(fd[1]);
   } else {
     close(fd[1]);
-    processManagerProcess(fd[0]);
+    processManagerProcess(fd[0], fname);
   }
 
   return rv;
