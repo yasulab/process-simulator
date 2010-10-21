@@ -1,0 +1,33 @@
+// TODO: write about:
+
+- Project summary œôó¦ what  the project includes, list of features, etc.
+
+- List of any problems encountered or parts of the assignment that are not included (differences between specifications of assignment and your completed project).  Also indicate why there are these differences.  Describe how you solved the problems you encountered.
+
+- Description of Scheduling policy you are using and description of how itœôòùs implemented.
+
+- Information about how to run the program œôó¦ what platform, how to start the program, any parameters that I need to provide.   (include anything that I might type that would cause the program to crash œôó¦ known œôòübugsœôòý)
+
+- If your files are compressed, indicate what algorithm is used and how I should uncompress them.
+
+// TODO: include:
+- Printed copy of sample run (screen shot)
+- Printed copy of code for all portions of the project
+
+====================== 
+What README contains?
+- What is this program?
+This program simulates how proceses run in an operating system on a CPU.
+It simulates essentail organizations in operating systems, such as Process and Scheduling.
+
+For further details, please download the following file.
+Simulation Exercises for Operating Systems
+http://www.it.uom.gr/teaching/moss/simulation-experiments.pdf
+
+- How to get latest codes?
+-- http://github.com/yasulab/process-simulator
+
+- 
+
+  
+
